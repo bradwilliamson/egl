@@ -32,6 +32,9 @@ jobs:
           elif [ -f Makefile ]; then
             echo "Using Makefile"
             make USE_SDL2=1 2>&1 | tee build.log
+          elif [ -f unix/Makefile ]; then
+            echo "Using unix/Makefile"
+            make -C unix USE_SDL2=1 2>&1 | tee build.log
           else
             echo "ERROR: no Makefile found" 2>&1 | tee build.log
             exit 2
