@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "shared.h"
 
+static qBool	bs_inited = qFalse;
+static qBool	bs_hostLittle = qTrue;
+
 /*
 ===============
 _FloatSwap
@@ -122,6 +125,48 @@ static int16 _ShortNoSwap (int16 s)
 	return s;
 }
 
+static inline void BS_EnsureInit (void)
+{
+	if (!bs_inited)
+		Swap_Init ();
+}
+
+float LittleFloat (float f)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _FloatNoSwap (f) : _FloatSwap (f);
+}
+
+int LittleLong (int l)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _LongNoSwap (l) : _LongSwap (l);
+}
+
+int16 LittleShort (int16 s)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _ShortNoSwap (s) : _ShortSwap (s);
+}
+
+float BigFloat (float f)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _FloatSwap (f) : _FloatNoSwap (f);
+}
+
+int BigLong (int l)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _LongSwap (l) : _LongNoSwap (l);
+}
+
+int16 BigShort (int16 s)
+{
+	BS_EnsureInit ();
+	return bs_hostLittle ? _ShortSwap (s) : _ShortNoSwap (s);
+}
+
 
 /*
 ===============
@@ -132,22 +177,6 @@ void Swap_Init (void)
 {
 	byte	swapTest[2] = { 1, 0 };
 
-	if (*(int16 *)swapTest == 1) {
-		// Little endian
-		LittleFloat = _FloatNoSwap;
-		LittleLong = _LongNoSwap;
-		LittleShort = _ShortNoSwap;
-		BigFloat = _FloatSwap;
-		BigLong = _LongSwap;
-		BigShort = _ShortSwap;
-	}
-	else {
-		// Big endian
-		LittleFloat = _FloatSwap;
-		LittleLong = _LongSwap;
-		LittleShort = _ShortSwap;
-		BigFloat = _FloatNoSwap;
-		BigLong = _LongNoSwap;
-		BigShort = _ShortNoSwap;
-	}
+	bs_hostLittle = (*(int16 *)swapTest == 1) ? qTrue : qFalse;
+	bs_inited = qTrue;
 }

@@ -721,12 +721,12 @@ qBool	Info_Validate (char *s);
 ==============================================================================
 */
 
-extern float		(*LittleFloat) (float f);
-extern int		(*LittleLong) (int l);
-extern int16		(*LittleShort) (int16 s);
-extern float		(*BigFloat) (float f);
-extern int		(*BigLong) (int l);
-extern int16		(*BigShort) (int16 s);
+float		LittleFloat (float f);
+int		LittleLong (int l);
+int16		LittleShort (int16 s);
+float		BigFloat (float f);
+int		BigLong (int l);
+int16		BigShort (int16 s);
 
 void		Swap_Init (void);
 

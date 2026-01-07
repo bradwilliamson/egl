@@ -222,3 +222,13 @@ void Sys_SetErrorText (const char *buf)
                      "********************\n");
   fprintf(stderr, "********************\nSYS ERROR: %s\n********************\n", buf);
 }
+
+/*
+==================
+Sys_SetConsoleTitle
+==================
+*/
+void Sys_SetConsoleTitle (const char *title)
+{
+	(void)title;
+}
