@@ -1,0 +1,44 @@
+name: CI - SDL2 Build & Smoke Test
+
+on:
+  push:
+    branches: [ main, sdl2-integration ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-sdl2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config
+
+      - name: Build project (SDL2)
+        run: |
+          make -f Makefile.unix USE_SDL2=1
+
+      - name: Compile SDL2 smoke test
+        run: |
+          gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` || gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2
+
+      - name: Run SDL2 smoke test (dummy audio)
+        env:
+          SDL_AUDIODRIVER: dummy
+        run: |
+          echo "Using SDL_AUDIODRIVER=$SDL_AUDIODRIVER"
+          ./ci/sdl2_smoke
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdl2-ci-logs
+          path: |
+            ci/sdl2_smoke
+            **/build.log
