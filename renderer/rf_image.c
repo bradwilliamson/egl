@@ -36,7 +36,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # include <wincodec.h>
 #else
 # include <jpeglib.h>
-//# include <png.h>
+# include <png.h>
+# include <setjmp.h>
 #endif
 
 #define MAX_IMAGE_HASH			(MAX_IMAGES/4)
@@ -412,19 +413,24 @@ static void R_LoadPCX (char *name, byte **pic, byte **palette, int *width, int *
 ==============================================================================
 */
 
-/*
 typedef struct pngBuf_s {
 	byte	*buffer;
 	size_t	pos;
+	size_t	len;
 } pngBuf_t;
 
-void PngReadFunc (png_struct *Png, png_bytep buf, png_size_t size)
+static void PngReadFunc (png_structp png, png_bytep outBytes, png_size_t byteCountToRead)
 {
-	pngBuf_t *PngFileBuffer = (pngBuf_t*)png_get_io_ptr(Png);
-	memcpy (buf,PngFileBuffer->buffer + PngFileBuffer->pos, size);
-	PngFileBuffer->pos += size;
+	pngBuf_t *src = (pngBuf_t *)png_get_io_ptr (png);
+
+	if (!src || !src->buffer || src->pos + byteCountToRead > src->len) {
+		png_error (png, "Read beyond end of buffer");
+		return;
+	}
+
+	memcpy (outBytes, src->buffer + src->pos, byteCountToRead);
+	src->pos += byteCountToRead;
 }
-*/
 
 /*
 =============
@@ -433,6 +439,9 @@ R_LoadPNG
 */
 static void R_LoadPNG (char *name, byte **pic, int *width, int *height, int *samples)
 {
+	// Windows uses WIC to decode PNGs from memory.
+	// Non-Windows uses libpng (matches CI deps and Makefile.unix link flags).
+#ifdef _WIN32
 	int			fileLen;
 	byte			*fileBuf;
 	HRESULT			hr;
@@ -582,6 +591,111 @@ cleanup:
 		CoUninitialize ();
 
 	FS_FreeFile (fileBuf);
+
+#else
+	int		fileLen;
+	byte		*fileBuf;
+	png_structp png;
+	png_infop info;
+	pngBuf_t src;
+	png_uint_32 w, h;
+	int bitDepth, colorType;
+	byte *out;
+	byte **rowPtrs;
+	int rowBytes;
+	int i;
+
+	if (pic)
+		*pic = NULL;
+	if (width)
+		*width = 0;
+	if (height)
+		*height = 0;
+	if (samples)
+		*samples = 0;
+
+	fileBuf = NULL;
+	fileLen = FS_LoadFile (name, (void **)&fileBuf, NULL);
+	if (!fileBuf || fileLen <= 0)
+		return;
+
+	// Basic signature check
+	if (fileLen < 8 || png_sig_cmp ((png_bytep)fileBuf, 0, 8)) {
+		FS_FreeFile (fileBuf);
+		return;
+	}
+
+	png = png_create_read_struct (PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (!png) {
+		FS_FreeFile (fileBuf);
+		return;
+	}
+	info = png_create_info_struct (png);
+	if (!info) {
+		png_destroy_read_struct (&png, NULL, NULL);
+		FS_FreeFile (fileBuf);
+		return;
+	}
+
+	if (setjmp (png_jmpbuf (png))) {
+		png_destroy_read_struct (&png, &info, NULL);
+		FS_FreeFile (fileBuf);
+		return;
+	}
+
+	src.buffer = fileBuf;
+	src.pos = 0;
+	src.len = (size_t)fileLen;
+	png_set_read_fn (png, &src, PngReadFunc);
+
+	png_read_info (png, info);
+	png_get_IHDR (png, info, &w, &h, &bitDepth, &colorType, NULL, NULL, NULL);
+
+	// Normalize to 8-bit RGBA
+	if (bitDepth == 16)
+		png_set_strip_16 (png);
+	if (colorType == PNG_COLOR_TYPE_PALETTE)
+		png_set_palette_to_rgb (png);
+	if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8)
+		png_set_expand_gray_1_2_4_to_8 (png);
+	if (png_get_valid (png, info, PNG_INFO_tRNS))
+		png_set_tRNS_to_alpha (png);
+	if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+		png_set_gray_to_rgb (png);
+	if (colorType == PNG_COLOR_TYPE_RGB || colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_PALETTE)
+		png_set_filler (png, 0xFF, PNG_FILLER_AFTER);
+	if (colorType == PNG_COLOR_TYPE_RGB_ALPHA)
+		; // already RGBA
+
+	png_read_update_info (png, info);
+
+	rowBytes = (int)png_get_rowbytes (png, info);
+	if (rowBytes <= 0 || w == 0 || h == 0) {
+		png_destroy_read_struct (&png, &info, NULL);
+		FS_FreeFile (fileBuf);
+		return;
+	}
+
+	out = Mem_PoolAlloc ((size_t)rowBytes * (size_t)h, ri.imageSysPool, r_imageAllocTag);
+	rowPtrs = Mem_PoolAlloc (sizeof (byte *) * (size_t)h, ri.imageSysPool, r_imageAllocTag);
+	for (i = 0; i < (int)h; i++)
+		rowPtrs[i] = out + (size_t)i * (size_t)rowBytes;
+
+	png_read_image (png, (png_bytepp)rowPtrs);
+	png_read_end (png, NULL);
+	png_destroy_read_struct (&png, &info, NULL);
+
+	if (pic)
+		*pic = out;
+	if (width)
+		*width = (int)w;
+	if (height)
+		*height = (int)h;
+	if (samples)
+		*samples = 4;
+
+	FS_FreeFile (fileBuf);
+#endif
 }
 
 
