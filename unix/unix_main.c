@@ -55,6 +55,8 @@ void GLimp_Shutdown (qBool full);
 void X11_Shutdown (void);
 #endif
 
+static int glob_match (char *pattern, char *text);
+
 /* Like glob_match, but match PATTERN against any final segment of TEXT.  */
 static int glob_match_after_star (char *pattern, char *text)
 {
@@ -667,6 +669,7 @@ void *Sys_LoadLibrary (libType_t libType, void *parms)
 	void		**lib;
 	const char	*libName;
 	char		*error;
+	(void)error;
 
 #if defined __i386__
 #ifdef NDEBUG
@@ -840,7 +843,9 @@ int main (int argc, char **argv)
 
 	// Go back to real user for config loads
 	saved_euid = geteuid ();
-	(void)seteuid (getuid ());
+	if (seteuid (getuid ()) == -1) {
+		// keep going; if it fails we'll likely error later on file access
+	}
 
 	Com_Init (argc, argv);
 

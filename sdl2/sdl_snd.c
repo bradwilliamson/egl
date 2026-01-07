@@ -171,9 +171,8 @@ qBool SndImp_Init (void)
     return Snd_SDL_Init ();
 }
 
-void SndImp_Shutdown (qBool full)
+void SndImp_Shutdown (void)
 {
-    (void)full;
     Snd_SDL_Shutdown ();
 }
 

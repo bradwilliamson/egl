@@ -32,6 +32,7 @@ extern cVar_t	*s_system;
 // unix_console.c
 void		Sys_InitConsole (void);
 void		Sys_ConsoleOutput (const char *string);
+void		Conbuf_AppendText (const char *pMsg);
 
 /*
 =======================================================================
