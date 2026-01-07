@@ -48,3 +48,4 @@ meshBuffer_t *R_AddMeshToList (material_t *mat, float matTime, refEntity_t *ent,
 // rf_2d.c
 //
 void		RF_2DInit (void);
+#endif // __RF_LOCAL_H__

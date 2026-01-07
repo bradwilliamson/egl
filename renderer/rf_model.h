@@ -502,6 +502,7 @@ void		R_EndModelRegistration (void);
 
 void		R_ModelInit (void);
 void		R_ModelShutdown (void);
+#endif // __RF_MODEL_H__
 
 //
 // rf_sprite.c

@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rb_local.h
 //
 
+#ifndef __RB_LOCAL_H__
+#define __RB_LOCAL_H__
+
 #include "r_local.h"
 
 #define FTABLE_SIZE		2048
@@ -97,3 +100,4 @@ void		RB_LoadTexMatrix (mat4x4_t m);
 void		RB_LoadIdentityTexMatrix (void);
 
 void		RB_BindProgram (program_t *program);
+#endif // __RB_LOCAL_H__

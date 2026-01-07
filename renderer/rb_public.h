@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Refresh backend header
 //
 
+#ifndef __RB_PUBLIC_H__
+#define __RB_PUBLIC_H__
+
 /*
 =============================================================================
 
@@ -30,7 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 =============================================================================
 */
 
-#define RB_MAX_VERTS			4096
+#define RB_MAX_VERTS			8192
 #define RB_MAX_INDEXES			RB_MAX_VERTS*6
 #define RB_MAX_TRIANGLES		RB_MAX_INDEXES/3
 #define RB_MAX_NEIGHBORS		RB_MAX_TRIANGLES*3
@@ -155,3 +158,4 @@ void		RB_TranslateForEntity (refEntity_t *ent);
 
 void		RB_AddNullModelToList (refEntity_t *ent);
 void		RB_DrawNullModelList (void);
+#endif // __RB_PUBLIC_H__

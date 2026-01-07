@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Refresh type definitions
 //
 
+#ifndef __R_TYPEDEFS_H__
+#define __R_TYPEDEFS_H__
+
 //
 // Rendering system
 //
@@ -62,3 +65,4 @@ typedef char			matPassTcMod_t;
 // Model subsystem
 //
 typedef char			modelType_t;
+#endif // __R_TYPEDEFS_H__

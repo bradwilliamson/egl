@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_public.h
 //
 
+#ifndef __RF_PUBLIC_H__
+#define __RF_PUBLIC_H__
+
 /*
 =============================================================================
 
@@ -112,3 +115,6 @@ extern meshList_t	*r_currentList;
 void	R_SortMeshList (void);
 void	R_DrawMeshList (qBool triangleOutlines);
 void	R_DrawMeshOutlines (void);
+
+#endif // __RF_PUBLIC_H__
+
