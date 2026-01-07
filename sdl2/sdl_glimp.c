@@ -16,6 +16,8 @@ TODO: flesh out full mode enumeration/setting, input hookup, and gamma control.
 static SDL_Window *sdl_window = NULL;
 static SDL_GLContext sdl_glctx = NULL;
 
+glxState_t glxState;
+
 /* Platform cvars */
 static cVar_t *vid_xpos = NULL;
 static cVar_t *vid_ypos = NULL;

@@ -10,7 +10,7 @@
 CC ?= cc
 
 # Common flags
-WARN_CFLAGS = -Wall -Wno-deprecated-declarations -Wno-unused-function
+WARN_CFLAGS = -Wall -Wno-deprecated-declarations -Wno-unused-function -fcommon
 OPT_CFLAGS ?= -O2
 
 CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing \
@@ -51,7 +51,7 @@ ifdef USE_SDL2
 UNIX_CLIENT_SRC = \
 	unix/unix_main.c unix/unix_console.c unix/unix_udp.c \
 	sdl2/sdl_main.c sdl2/sdl_glimp.c sdl2/sdl_input.c \
-	sdl2/sdl_snd.c
+	sdl2/sdl_snd.c unix/unix_snd_cd.c
 CFLAGS_COMMON += -DHAVE_SDL2
 LDFLAGS_CLIENT += -lSDL2 -lSDL2main
 else

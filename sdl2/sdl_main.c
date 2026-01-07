@@ -22,3 +22,7 @@ void SDL2_ShutdownHook (void)
 {
     SDL_Quit ();
 }
+
+void X11_Shutdown (void)
+{
+}

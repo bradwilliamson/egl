@@ -165,3 +165,29 @@ void Snd_SDL_Submit (void)
     if (s_sdl_dev)
         SDL_UnlockAudioDevice (s_sdl_dev);
 }
+
+qBool SndImp_Init (void)
+{
+    return Snd_SDL_Init ();
+}
+
+void SndImp_Shutdown (qBool full)
+{
+    (void)full;
+    Snd_SDL_Shutdown ();
+}
+
+int SndImp_GetDMAPos (void)
+{
+    return Snd_SDL_GetDMAPos ();
+}
+
+void SndImp_BeginPainting (void)
+{
+    Snd_SDL_BeginPainting ();
+}
+
+void SndImp_Submit (void)
+{
+    Snd_SDL_Submit ();
+}

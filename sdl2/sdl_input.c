@@ -68,3 +68,14 @@ void IN_Frame (void)
 #endif
     SDL2_PollInputEvents ();
 }
+
+void IN_Init (void)
+{
+    /* Minimal init; full mapping/focus handling can be added later */
+    SDL_SetRelativeMouseMode (SDL_TRUE);
+}
+
+void IN_Shutdown (void)
+{
+    SDL_SetRelativeMouseMode (SDL_FALSE);
+}
