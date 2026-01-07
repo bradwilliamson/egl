@@ -18,3 +18,66 @@
 /win32/vs17/game/x64
 /win32/vs17/shared/x64
 /win32/vs17/shared/Win32
+*.o
+
+# Make/MinGW dependency + intermediates
+*.d
+*.obj
+*.a
+*.lib
+*.exp
+*.ilk
+*.idb
+*.ipch
+*.pdb
+*.tlog
+*.lastbuildstate
+
+# Built binaries (local)
+*.exe
+*.dll
+*.so
+*.dylib
+egl
+eglded
+
+# MSYS2/MinGW odds and ends
+*.stackdump
+
+# Local runtime/output directory created by builds/runs
+# Local Quake2 game data install (not required to build; often proprietary assets)
+/baseq2/
+
+# Local scratch/old copies
+/EGLold/
+
+# Local stub sources used during experimentation (not intended to ship)
+/client/ui_stubs.c
+/common/zlib_stubs.c
+/server/server_stubs.c
+/cgame/cg_cvars.c
+
+# Packaged portable builds
+/out/
+
+# Common build output dirs
+/build/
+/dist/
+/release/
+
+# Local archives / exports
+/egl.zip
+/out/**/*.zip
+
+# VS Code (optional: keep if you commit workspace settings)
+.vscode/
+
+# Clangd/IntelliSense helpers (optional)
+compile_commands.json
+.cache/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

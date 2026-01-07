@@ -36,7 +36,7 @@ static byte			r_q3BspNoVis[Q3BSP_MAX_VIS];
 
 extern int			r_q2_lmSize;
 
-cVar_t	*flushmap;
+extern cVar_t	*flushmap;
 
 /*
 =================
@@ -4429,7 +4429,6 @@ R_ModelInit
 void R_ModelInit (void)
 {
 	// Register commands/cvars
-	flushmap	= Cvar_Register ("flushmap",		"0",		0);
 
 	cmd_modelList = Cmd_AddCommand ("modellist",	R_ModelList_f,		"Prints to the console a list of loaded models and their sizes");
 

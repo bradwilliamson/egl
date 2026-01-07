@@ -64,6 +64,52 @@ typedef struct m_vidSettingsMenu_s {
 
 static m_vidSettingsMenu_t	m_vidSettingsMenu;
 
+static char *m_vidSettings_resolutions[] = {
+	// Must match renderer's mode table order (gl_mode indices) to keep configs stable.
+	"[CUSTOM    ]",
+
+	// 4:3
+	"[320 240   ]",
+	"[400 300   ]",
+	"[512 384   ]",
+	"[640 480   ]",
+	"[800 600   ]",
+	"[960 720   ]",
+	"[1024 768  ]",
+	"[1152 864  ]",
+	"[1280 960  ]",
+	"[1600 1200 ]",
+	"[1920 1440 ]",
+	"[2048 1536 ]",
+
+	// widescreen (legacy)
+	"[1280 800 (ws)]",
+	"[1440 900 (ws)]",
+
+	// widescreen / modern
+	"[1280 720 (ws)]",
+	"[1366 768 (ws)]",
+	"[1600 900 (ws)]",
+	"[1920 1080 (ws)]",
+	"[2560 1440 (ws)]",
+	"[3840 2160 (ws)]",
+	"[2560 1080 (uw)]",
+	"[3440 1440 (uw)]",
+	"[5120 1440 (uw)]",
+	0
+};
+
+static int VIDSettingsMenu_MaxMode (void)
+{
+	int count;
+
+	// Index 0 is [CUSTOM]. Modes start at 1 and map to gl_mode = curValue - 1.
+	for (count = 0; m_vidSettings_resolutions[count + 1]; count++)
+		;
+
+	return count - 1;
+}
+
 static void VIDSettingsMenu_Init (void);
 static void ResetDefaults (void *unused) {
 	VIDSettingsMenu_Init ();
@@ -138,7 +184,7 @@ VIDSettingsMenu_SetValues
 */
 static void VIDSettingsMenu_SetValues (void)
 {
-	cgi.Cvar_SetValue ("gl_mode",		clamp (cgi.Cvar_GetIntegerValue ("gl_mode"), 0, 12), qTrue);
+	cgi.Cvar_SetValue ("gl_mode",		clamp (cgi.Cvar_GetIntegerValue ("gl_mode"), 0, VIDSettingsMenu_MaxMode ()), qTrue);
 	if (cgi.Cvar_GetIntegerValue ("vid_width") && cgi.Cvar_GetIntegerValue ("vid_height"))
 		m_vidSettingsMenu.mode_list.curValue	= 0;
 	else
@@ -196,28 +242,6 @@ VIDSettingsMenu_Init
 */
 static void VIDSettingsMenu_Init (void)
 {
-	static char *resolutions[] = {
-		// 4:3
-		"[CUSTOM    ]",
-		"[320 240   ]",
-		"[400 300   ]",
-		"[512 384   ]",
-		"[640 480   ]",
-		"[800 600   ]",
-		"[960 720   ]",
-		"[1024 768  ]",
-		"[1152 864  ]",
-		"[1280 960  ]",
-		"[1600 1200 ]",
-		"[1920 1440 ]",
-		"[2048 1536 ]",
-
-		// widescreen
-		"[1280 800 (ws)]",
-		"[1440 900 (ws)]",
-		0
-	};
-
 	static char *refs[] = {
 		"[default OpenGL]",
 		"[3Dfx OpenGL   ]",
@@ -278,7 +302,7 @@ static void VIDSettingsMenu_Init (void)
 
 	m_vidSettingsMenu.mode_list.generic.type		= UITYPE_SPINCONTROL;
 	m_vidSettingsMenu.mode_list.generic.name		= "Resolution";
-	m_vidSettingsMenu.mode_list.itemNames			= resolutions;
+	m_vidSettingsMenu.mode_list.itemNames			= m_vidSettings_resolutions;
 	m_vidSettingsMenu.mode_list.generic.statusBar	= "Resolution Selection";
 
 	m_vidSettingsMenu.tm_list.generic.type		= UITYPE_SPINCONTROL;

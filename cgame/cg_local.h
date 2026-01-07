@@ -422,6 +422,16 @@ extern cVar_t	*cl_testparticles;
 extern cVar_t	*r_hudScale;
 extern cVar_t	*r_fontScale;
 
+extern cVar_t	*r_effectscale;
+extern cVar_t	*r_effectscale_blaster;
+extern cVar_t	*r_effectscale_bfg;
+extern cVar_t	*r_effectscale_explo;
+extern cVar_t	*r_effectscale_ion;
+extern cVar_t	*r_effectscale_phalanx;
+extern cVar_t	*r_effectscale_rail;
+extern cVar_t	*r_effectscale_smoke;
+extern cVar_t	*r_effectscale_spark;
+
 extern cVar_t	*crosshair;
 extern cVar_t	*ch_alpha;
 extern cVar_t	*ch_pulse;

@@ -1709,6 +1709,7 @@ static void RB_SetupPassState (matPass_t *pass, qBool mTex)
 {
 	program_t	*program;
 	uint32		sb1;
+	float		glowIntensity;
 
 	sb1 = rb_stateBits1|pass->stateBits1;
 
@@ -1748,6 +1749,13 @@ static void RB_SetupPassState (matPass_t *pass, qBool mTex)
 		qglProgramLocalParameter4fARB (GL_FRAGMENT_PROGRAM_ARB, 6, rb.curEntity->axis[1][0], rb.curEntity->axis[1][1], rb.curEntity->axis[1][2], 0);
 		qglProgramLocalParameter4fARB (GL_FRAGMENT_PROGRAM_ARB, 7, rb.curEntity->axis[2][0], rb.curEntity->axis[2][1], rb.curEntity->axis[2][2], 0);
 		qglProgramLocalParameter4fARB (GL_FRAGMENT_PROGRAM_ARB, 8, rb_matTime, 0, 0, 0);
+
+		// EGL emissive/glow: only apply on particle materials, and only for the dedicated glow programs.
+		if (rb.curMat && rb.curMat->sortKey <= MAT_SORT_PARTICLE+1) {
+			if (R_ProgramGetGlowIntensity (program, &glowIntensity)) {
+				R_ProgramSetEmissiveIntensity (glowIntensity);
+			}
+		}
 	}
 	else if (ri.config.extFragmentProgram)
 		qglDisable (GL_FRAGMENT_PROGRAM_ARB);
@@ -1957,7 +1965,7 @@ static void RB_RenderCombine (void)
 			break;
 
 		case GL_DECAL:
-			// Mimics Alpha-Blending in upper texture stage, but instead of multiplying the alpha-channel, they´re added
+			// Mimics Alpha-Blending in upper texture stage, but instead of multiplying the alpha-channel, theyï¿½re added
 			// this way it can be possible to use GL_DECAL in both texture-units, while still looking good
 			// normal mutlitexturing would multiply the alpha-channel which looks ugly
 			RB_TextureEnv (GL_COMBINE_ARB);
@@ -2514,6 +2522,17 @@ void RB_RenderMeshBuffer (meshBuffer_t *mb, qBool shadowPass)
 	// Accumulate passes and render
 	debugLightmap = qFalse;
 	for (i=0, pass=mb->mat->passes ; i<mb->mat->numPasses ; pass++, i++) {
+		// EGL emissive/glow: skip the glow pass entirely when disabled.
+		// This keeps the default path free of extra passes/draws.
+		if (rb.curMat && rb.curMat->sortKey <= MAT_SORT_PARTICLE+1) {
+			if ((pass->flags & MAT_PASS_FRAGMENTPROGRAM) && pass->fragProgPtr) {
+				float glowIntensity;
+				if (R_ProgramGetGlowIntensity (pass->fragProgPtr, &glowIntensity) && glowIntensity <= 0.0f) {
+					continue;
+				}
+			}
+		}
+
 		if (pass->flags & MAT_PASS_LIGHTMAP) {
 			if (rb.curLMTexNum < 0)
 				continue;

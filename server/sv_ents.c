@@ -123,6 +123,23 @@ static void SV_EmitPacketEntities (clientFrame_t *from, clientFrame_t *to, netMs
 SV_WritePlayerstateToClient
 =============
 */
+static int SV_WriteCharScaledClamp (const char *name, float value, float scale)
+{
+	int c = (int)(value * scale);
+	if (c < -128 || c > 127) {
+		static int warnCount;
+		if (warnCount < 16) {
+			warnCount++;
+			Com_Printf (PRNT_WARNING, "SV_WritePlayerstateToClient: %s=%g (x%g => %d) out of range, clamping\n", name, value, scale, c);
+		}
+		if (c < -128)
+			c = -128;
+		else
+			c = 127;
+	}
+	return c;
+}
+
 static void SV_WritePlayerstateToClient (clientFrame_t *from, clientFrame_t *to, netMsg_t *msg)
 {
 	playerState_t	*ps, *ops;
@@ -237,9 +254,9 @@ static void SV_WritePlayerstateToClient (clientFrame_t *from, clientFrame_t *to,
 
 	// Write the rest of the playerState_t
 	if (psFlags & PS_VIEWOFFSET) {
-		MSG_WriteChar (msg, ps->viewOffset[0]*4);
-		MSG_WriteChar (msg, ps->viewOffset[1]*4);
-		MSG_WriteChar (msg, ps->viewOffset[2]*4);
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("viewOffset[0]", ps->viewOffset[0], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("viewOffset[1]", ps->viewOffset[1], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("viewOffset[2]", ps->viewOffset[2], 4));
 	}
 
 	if (psFlags & PS_VIEWANGLES) {
@@ -249,9 +266,9 @@ static void SV_WritePlayerstateToClient (clientFrame_t *from, clientFrame_t *to,
 	}
 
 	if (psFlags & PS_KICKANGLES) {
-		MSG_WriteChar (msg, ps->kickAngles[0]*4);
-		MSG_WriteChar (msg, ps->kickAngles[1]*4);
-		MSG_WriteChar (msg, ps->kickAngles[2]*4);
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("kickAngles[0]", ps->kickAngles[0], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("kickAngles[1]", ps->kickAngles[1], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("kickAngles[2]", ps->kickAngles[2], 4));
 	}
 
 	if (psFlags & PS_WEAPONINDEX) {
@@ -260,12 +277,12 @@ static void SV_WritePlayerstateToClient (clientFrame_t *from, clientFrame_t *to,
 
 	if (psFlags & PS_WEAPONFRAME) {
 		MSG_WriteByte (msg, ps->gunFrame);
-		MSG_WriteChar (msg, ps->gunOffset[0]*4);
-		MSG_WriteChar (msg, ps->gunOffset[1]*4);
-		MSG_WriteChar (msg, ps->gunOffset[2]*4);
-		MSG_WriteChar (msg, ps->gunAngles[0]*4);
-		MSG_WriteChar (msg, ps->gunAngles[1]*4);
-		MSG_WriteChar (msg, ps->gunAngles[2]*4);
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunOffset[0]", ps->gunOffset[0], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunOffset[1]", ps->gunOffset[1], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunOffset[2]", ps->gunOffset[2], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunAngles[0]", ps->gunAngles[0], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunAngles[1]", ps->gunAngles[1], 4));
+		MSG_WriteChar (msg, SV_WriteCharScaledClamp ("gunAngles[2]", ps->gunAngles[2], 4));
 	}
 
 	if (psFlags & PS_BLEND) {

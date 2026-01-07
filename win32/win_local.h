@@ -64,3 +64,8 @@ void	Conbuf_AppendText (const char *pMsg);
 
 void	IN_Activate (qBool active);
 void	IN_MouseEvent (int mstate);
+
+/* Raw Input helpers */
+void	IN_EnableRawInput (void);
+void	IN_DisableRawInput (void);
+qBool	IN_RawInputActive (void);

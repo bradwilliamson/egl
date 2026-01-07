@@ -1252,6 +1252,7 @@ static qBool MatBase_Flare (material_t *mat, matPass_t *pass, parse_t *ps, char 
 
 static qBool MatPass_Emissive (material_t *mat, matPass_t *pass, parse_t *ps, char *fileName)
 {
+	pass->flags |= MAT_PASS_EMISSIVE;
 	return qTrue;
 }
 

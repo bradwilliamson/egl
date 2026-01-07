@@ -30,8 +30,24 @@ RB_BackendOverflow
 */
 qBool RB_BackendOverflow (int numVerts, int numIndexes)
 {
-	return (rb.numVerts + numVerts > RB_MAX_VERTS
-		|| rb.numIndexes + numIndexes > RB_MAX_INDEXES);
+	int maxVerts = RB_MAX_VERTS;
+	int maxIndexes = RB_MAX_INDEXES;
+
+	// Optional particle-only cap (quad particles => 4 verts, 6 indexes)
+	if (rb.curMat && rb.curMat->sortKey <= MAT_SORT_PARTICLE+1 && r_max_batch_particles) {
+		int capVerts = r_max_batch_particles->intVal;
+		if (capVerts < 256)
+			capVerts = 256;
+		// Round down to a multiple of 4 for quad particles.
+		capVerts = (capVerts / 4) * 4;
+		if (capVerts < maxVerts) {
+			maxVerts = capVerts;
+			maxIndexes = (maxVerts / 4) * 6;
+		}
+	}
+
+	return (rb.numVerts + numVerts > maxVerts
+		|| rb.numIndexes + numIndexes > maxIndexes);
 }
 
 

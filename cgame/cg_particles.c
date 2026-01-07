@@ -23,6 +23,61 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "cg_local.h"
 
+static inline float CG_EffectScaleMultForParticleType (uint32 type)
+{
+	float mult = 1.0f;
+
+	switch (type) {
+		case PT_BLASTER_BLUE:
+		case PT_BLASTER_GREEN:
+		case PT_BLASTER_RED:
+			mult *= r_effectscale_blaster->floatVal;
+			break;
+
+		case PT_BFG_DOT:
+			mult *= r_effectscale_bfg->floatVal;
+			break;
+
+		case PT_IONTAIL:
+		case PT_IONTIP:
+			mult *= r_effectscale_ion->floatVal;
+			break;
+
+		case PT_PHALANXTIP:
+			mult *= r_effectscale_phalanx->floatVal;
+			break;
+
+		case PT_RAIL_CORE:
+		case PT_RAIL_WAVE:
+		case PT_RAIL_SPIRAL:
+			mult *= r_effectscale_rail->floatVal;
+			break;
+	}
+
+	// Shared categories (used by many weapons)
+	if (type == PT_SPARK)
+		mult *= r_effectscale_spark->floatVal;
+
+	if (type == PT_SMOKE || type == PT_SMOKE2
+	|| type == PT_SMOKEGLOW || type == PT_SMOKEGLOW2
+	|| type == PT_BLUEFIRE
+	|| (type >= PT_FIRE1 && type <= PT_FIRE4)
+	|| (type >= PT_EMBERS1 && type <= PT_EMBERS3)
+	|| type == PT_FLARE || type == PT_FLAREGLOW)
+		mult *= r_effectscale_smoke->floatVal;
+
+	if (type == PT_EXPLOFLASH || type == PT_EXPLOWAVE
+	|| (type >= PT_EXPLO1 && type <= PT_EXPLO7)
+	|| (type >= PT_EXPLOEMBERS1 && type <= PT_EXPLOEMBERS2))
+		mult *= r_effectscale_explo->floatVal;
+
+	// Avoid negative multipliers producing inverted sizes.
+	if (mult < 0.0f)
+		mult = 0.0f;
+
+	return mult;
+}
+
 static cgParticle_t		*cg_freeParticles;
 static cgParticle_t		cg_particleHeadNode, cg_particleList[MAX_PARTICLES];
 static int				cg_numParticles;
@@ -204,6 +259,7 @@ void CG_AddParticles (void)
 	float			lightest;
 	vec3_t			shade;
 	float			scale;
+	float			effectScale;
 	vec3_t			p_upVec, p_rtVec;
 	vec3_t			a_upVec, a_rtVec;
 	vec3_t			point, width, move;
@@ -215,6 +271,14 @@ void CG_AddParticles (void)
 	CG_AddSustains ();
 	if (!cl_add_particles->intVal)
 		return;
+
+	// Effect scale
+	effectScale = r_effectscale->floatVal;
+	if (effectScale == 0.0f) {
+		int w = cgi.Cvar_GetIntegerValue("vid_width");
+		int h = cgi.Cvar_GetIntegerValue("vid_height");
+		effectScale = sqrt((w * h) / (1024.0f * 768.0f));
+	}
 
 	Vec3Scale (cg.refDef.viewAxis[2], 0.75f, p_upVec);
 	Vec3Scale (cg.refDef.rightVec, 0.75f, p_rtVec);
@@ -288,6 +352,9 @@ void CG_AddParticles (void)
 		else {
 			size = p->size;
 		}
+
+		// Apply effect scale (+ per-family multipliers)
+		size *= effectScale * CG_EffectScaleMultForParticleType (p->type);
 
 		if (size < 0.0f)
 			goto nextParticle;

@@ -869,6 +869,12 @@ void Snd_Init (void)
 {
 	uint32	initTime;
 
+#if defined(__unix__)
+#define S_DEFAULT_INIT_SOUND "2"
+#else
+#define S_DEFAULT_INIT_SOUND "1"
+#endif
+
 	if (snd_isInitialized)
 		Snd_Shutdown ();
 
@@ -882,7 +888,7 @@ void Snd_Init (void)
 	snd_queueRestart = qFalse;
 	snd_registrationFrame = 1;
 
-	s_initSound			= Cvar_Register ("s_initSound",			"1",			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
+	s_initSound			= Cvar_Register ("s_initSound",			S_DEFAULT_INIT_SOUND,			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
 	s_volume			= Cvar_Register ("s_volume",			"0.7",			CVAR_ARCHIVE);
 	s_loadas8bit		= Cvar_Register ("s_loadas8bit",		"0",			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
 

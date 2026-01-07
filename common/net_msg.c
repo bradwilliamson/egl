@@ -133,11 +133,21 @@ MSG_WriteChar
 void MSG_WriteChar (netMsg_t *dest, int c)
 {
 	byte	*buf;
+	static qBool warned;
 
-	assert (!(c < -128 || c > 127));
+	if (c < -128 || c > 127) {
+		if (!warned) {
+			warned = qTrue;
+			Com_Printf (PRNT_WARNING, "MSG_WriteChar: value %d out of range (-128..127), clamping\n", c);
+		}
+		if (c < -128)
+			c = -128;
+		else if (c > 127)
+			c = 127;
+	}
 
 	buf = MSG_GetWriteSpace (dest, 1);
-	buf[0] = c;
+	buf[0] = (byte) (signed char) c;
 }
 
 

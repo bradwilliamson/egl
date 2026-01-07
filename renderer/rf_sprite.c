@@ -37,6 +37,28 @@ static vec2_t	r_spriteCoords[4];
 static vec3_t	r_spriteVerts[4];
 static vec3_t	r_spriteNormals[4];
 
+static inline float R_EffectScaleMultForSP2Model (const char *modelName)
+{
+	if (!modelName || !modelName[0])
+		return 1.0f;
+
+	// BFG sprites
+	if (Q_WildcardMatch ("sprites/s_bfg*.sp2", (char *)modelName, 1))
+		return r_effectscale_bfg->floatVal;
+
+	// Xatrix phalanx projectile sprite
+	if (!Q_stricmp (modelName, "sprites/s_photon.sp2"))
+		return r_effectscale_phalanx->floatVal;
+
+	// Fire/flame sprites (commonly used for rocket/stinger visuals in mods)
+	if (!Q_stricmp (modelName, "sprites/s_firea.sp2")
+	|| !Q_stricmp (modelName, "sprites/s_fireb.sp2")
+	|| !Q_stricmp (modelName, "sprites/s_flame.sp2"))
+		return r_effectscale_smoke->floatVal;
+
+	return 1.0f;
+}
+
 /*
 =================
 R_AddSP2ModelToList
@@ -72,9 +94,17 @@ void R_DrawSP2Model (meshBuffer_t *mb)
 	mSpriteFrame_t	*spriteFrame;
 	mesh_t			mesh;
 	meshFeatures_t	features;
+	float			scale;
 
 	spriteModel = (mSpriteModel_t *)mb->mesh;
 	spriteFrame = &spriteModel->frames[mb->entity->frame % spriteModel->numFrames];
+
+	// Effect scale
+	scale = r_effectscale->floatVal;
+	if (scale == 0.0f)
+		scale = sqrt((vid_width->intVal * vid_height->intVal) / (1024.0f * 768.0f));
+
+	scale *= R_EffectScaleMultForSP2Model (mb->entity->model ? mb->entity->model->name : NULL);
 
 	//
 	// Culling
@@ -87,31 +117,36 @@ void R_DrawSP2Model (meshBuffer_t *mb)
 	//
 	// create verts/normals/coords
 	//
+	float scaledWidth = spriteFrame->width * scale;
+	float scaledHeight = spriteFrame->height * scale;
+	float scaledOriginX = spriteFrame->originX * scale;
+	float scaledOriginY = spriteFrame->originY * scale;
+
 	Vec4Copy (mb->entity->color, r_spriteColors[0]);
-	r_spriteVerts[0][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * -spriteFrame->originY) + (ri.def.rightVec[0] * -spriteFrame->originX);
-	r_spriteVerts[0][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * -spriteFrame->originY) + (ri.def.rightVec[1] * -spriteFrame->originX);
-	r_spriteVerts[0][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * -spriteFrame->originY) + (ri.def.rightVec[2] * -spriteFrame->originX);
+	r_spriteVerts[0][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * -scaledOriginY) + (ri.def.rightVec[0] * -scaledOriginX);
+	r_spriteVerts[0][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * -scaledOriginY) + (ri.def.rightVec[1] * -scaledOriginX);
+	r_spriteVerts[0][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * -scaledOriginY) + (ri.def.rightVec[2] * -scaledOriginX);
 	Vec2Set (r_spriteCoords[0], 0, 1);
 	Vec3Set (r_spriteNormals[0], 0, 1, 0);
 
 	Vec4Copy (mb->entity->color, r_spriteColors[1]);
-	r_spriteVerts[1][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[0] * -spriteFrame->originX);
-	r_spriteVerts[1][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[1] * -spriteFrame->originX);
-	r_spriteVerts[1][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[2] * -spriteFrame->originX);
+	r_spriteVerts[1][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[0] * -scaledOriginX);
+	r_spriteVerts[1][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[1] * -scaledOriginX);
+	r_spriteVerts[1][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[2] * -scaledOriginX);
 	Vec2Set (r_spriteCoords[1], 0, 0);
 	Vec3Set (r_spriteNormals[1], 0, 1, 0);
 
 	Vec4Copy (mb->entity->color, r_spriteColors[2]);
-	r_spriteVerts[2][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[0] * (spriteFrame->width-spriteFrame->originX));
-	r_spriteVerts[2][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[1] * (spriteFrame->width-spriteFrame->originX));
-	r_spriteVerts[2][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * (spriteFrame->height-spriteFrame->originY)) + (ri.def.rightVec[2] * (spriteFrame->width-spriteFrame->originX));
+	r_spriteVerts[2][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[0] * (scaledWidth-scaledOriginX));
+	r_spriteVerts[2][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[1] * (scaledWidth-scaledOriginX));
+	r_spriteVerts[2][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * (scaledHeight-scaledOriginY)) + (ri.def.rightVec[2] * (scaledWidth-scaledOriginX));
 	Vec2Set (r_spriteCoords[2], 1, 0);
 	Vec3Set (r_spriteNormals[2], 0, 1, 0);
 
 	Vec4Copy (mb->entity->color, r_spriteColors[3]);
-	r_spriteVerts[3][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * -spriteFrame->originY) + (ri.def.rightVec[0] * (spriteFrame->width-spriteFrame->originX));
-	r_spriteVerts[3][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * -spriteFrame->originY) + (ri.def.rightVec[1] * (spriteFrame->width-spriteFrame->originX));
-	r_spriteVerts[3][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * -spriteFrame->originY) + (ri.def.rightVec[2] * (spriteFrame->width-spriteFrame->originX));
+	r_spriteVerts[3][0] = mb->entity->origin[0] + (ri.def.viewAxis[2][0] * -scaledOriginY) + (ri.def.rightVec[0] * (scaledWidth-scaledOriginX));
+	r_spriteVerts[3][1] = mb->entity->origin[1] + (ri.def.viewAxis[2][1] * -scaledOriginY) + (ri.def.rightVec[1] * (scaledWidth-scaledOriginX));
+	r_spriteVerts[3][2] = mb->entity->origin[2] + (ri.def.viewAxis[2][2] * -scaledOriginY) + (ri.def.rightVec[2] * (scaledWidth-scaledOriginX));
 	Vec2Set (r_spriteCoords[3], 1, 1);
 	Vec3Set (r_spriteNormals[3], 0, 1, 0);
 

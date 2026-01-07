@@ -24,12 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "cl_local.h"
 
-cVar_t *allow_download;
-cVar_t *allow_download_players;
-cVar_t *allow_download_models;
-cVar_t *allow_download_sounds;
-cVar_t *allow_download_maps;
-
 cVar_t	*cl_lightlevel;
 cVar_t	*cl_downloadToBase;
 cVar_t	*cl_maxfps;
@@ -71,8 +65,6 @@ cVar_t	*m_side;
 
 cVar_t	*rcon_clpassword;
 cVar_t	*rcon_address;
-
-cVar_t	*r_fontScale;
 
 cVar_t	*sensitivity;
 
@@ -1647,11 +1639,8 @@ CL_Register
 static void CL_Register (void)
 {
 	// Register our variables
-	allow_download			= Cvar_Register ("allow_download",			"1",	CVAR_ARCHIVE);
-	allow_download_players	= Cvar_Register ("allow_download_players",	"0",	CVAR_ARCHIVE);
-	allow_download_models	= Cvar_Register ("allow_download_models",	"1",	CVAR_ARCHIVE);
-	allow_download_sounds	= Cvar_Register ("allow_download_sounds",	"1",	CVAR_ARCHIVE);
-	allow_download_maps		= Cvar_Register ("allow_download_maps",		"1",	CVAR_ARCHIVE);
+	// allow_download* cvars are registered by the server subsystem (SV_ServerInit)
+	// so they can be shared between the integrated client/server.
 
 	cl_downloadToBase		= Cvar_Register ("cl_downloadToBase",		"0",		CVAR_ARCHIVE);
 	cl_lightlevel			= Cvar_Register ("r_lightlevel",			"0",		0);
@@ -1682,7 +1671,7 @@ static void CL_Register (void)
 	con_drop				= Cvar_Register ("con_drop",				"0.5",		CVAR_ARCHIVE);
 	con_scroll				= Cvar_Register ("con_scroll",				"2",		CVAR_ARCHIVE);
 
-	freelook				= Cvar_Register ("freelook",				"0",		CVAR_ARCHIVE);
+	freelook				= Cvar_Register ("freelook",				"1",		CVAR_ARCHIVE);
 
 	lookspring				= Cvar_Register ("lookspring",				"0",		CVAR_ARCHIVE);
 	lookstrafe				= Cvar_Register ("lookstrafe",				"0",		CVAR_ARCHIVE);
@@ -1694,8 +1683,6 @@ static void CL_Register (void)
 
 	rcon_clpassword			= Cvar_Register ("rcon_password",			"",			0);
 	rcon_address			= Cvar_Register ("rcon_address",			"",			0);
-
-	r_fontScale				= Cvar_Register ("r_fontScale",				"1",		CVAR_ARCHIVE);
 
 	sensitivity				= Cvar_Register ("sensitivity",				"3",		CVAR_ARCHIVE);
 

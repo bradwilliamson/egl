@@ -37,7 +37,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # include "../win32/win_glimp.h"
 
 # define LOGPROC	(glwState.oglLogFP)
-# define GL_GPA(a)	(void *)GetProcAddress (glwState.hInstOpenGL, a)
+# ifndef GL_GPA
+static void *QGL_WinGetProcAddress (const char *procName)
+{
+	void *proc = (void *)GetProcAddress (glwState.hInstOpenGL, procName);
+	if (!proc)
+		proc = (void *)wglGetProcAddress ((LPCSTR) procName);
+	return proc;
+}
+
+# define GL_GPA(a)	QGL_WinGetProcAddress (a)
+# endif
 # define SIG(x)		fprintf (glwState.oglLogFP, x "\n")
 
 #elif defined __unix__

@@ -504,7 +504,6 @@ void		R_EndModelRegistration (void);
 
 void		R_ModelInit (void);
 void		R_ModelShutdown (void);
-#endif // __RF_MODEL_H__
 
 //
 // rf_sprite.c
@@ -515,3 +514,5 @@ void		R_DrawSP2Model (meshBuffer_t *mb);
 
 qBool		R_FlareOverflow (void);
 void		R_PushFlare (meshBuffer_t *mb);
+
+#endif // __RF_MODEL_H__

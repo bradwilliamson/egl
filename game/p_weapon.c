@@ -1406,7 +1406,9 @@ void weapon_bfg_fire (edict_t *ent)
 	Vec3Scale (forward, -2, ent->client->kick_origin);
 
 	// make a big pitch kick with an inverse fall
-	ent->client->v_dmg_pitch = -40;
+	// NOTE: v_dmg_pitch contributes to ps.kickAngles[PITCH], which is packed as a signed byte (value*4)
+	// and cannot represent magnitudes >= 32 degrees.
+	ent->client->v_dmg_pitch = -32;
 	ent->client->v_dmg_roll = crandom()*8;
 	ent->client->v_dmg_time = level.time + DAMAGE_TIME;
 

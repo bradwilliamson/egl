@@ -122,7 +122,7 @@ typedef struct guiVar_s {
 } guiVar_t;
 
 void		GUIVar_Init (void);
-#endif // __GUI_LOCAL_H__void		GUIVar_Shutdown (void);
+void		GUIVar_Shutdown (void);
 
 /*
 =============================================================================
@@ -660,3 +660,5 @@ void		GUI_Shutdown (void);
 // gui_main.c
 //
 void		GUI_ResetGUIState (gui_t *gui);
+
+#endif // __GUI_LOCAL_H__

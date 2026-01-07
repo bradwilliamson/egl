@@ -467,7 +467,7 @@ void SndImp_BeginPainting (void)
 	reps = 0;
 	snd_audioDMA.buffer = NULL;
 	for ( ; ; ) {
-		hresult = snd_win.pDSBuf->lpVtbl->Lock (snd_win.pDSBuf, 0, snd_win.bufferSize, &pbuf, &snd_win.lockSize, &pbuf2, &dwSize2, 0);
+		hresult = snd_win.pDSBuf->lpVtbl->Lock (snd_win.pDSBuf, 0, snd_win.bufferSize, (void **)&pbuf, &snd_win.lockSize, (void **)&pbuf2, &dwSize2, 0);
 		if (hresult == DS_OK)
 			break;
 		if (hresult != DSERR_BUFFERLOST) {

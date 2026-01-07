@@ -236,8 +236,9 @@ void	ALSnd_Shutdown (void);
 
 qBool	SndImp_Init (void);
 
-#endif // __SND_LOCAL_H__			// initializes cycling through a DMA buffer and returns information on it
-int		SndImp_GetDMAPos (void);	// gets the current DMA position
+int		SndImp_GetDMAPos (void);	// initializes cycling through a DMA buffer and returns information on it
 void	SndImp_BeginPainting (void);
 void	SndImp_Submit (void);
 void	SndImp_Shutdown (void);
+
+#endif // __SND_LOCAL_H__

@@ -89,6 +89,23 @@ cVar_t	*r_flares;
 cVar_t	*r_flareFade;
 cVar_t	*r_flareSize;
 cVar_t	*r_fontScale;
+cVar_t	*r_effectscale;
+cVar_t	*r_effectscale_blaster;
+cVar_t	*r_effectscale_bfg;
+cVar_t	*r_effectscale_explo;
+cVar_t	*r_effectscale_ion;
+cVar_t	*r_effectscale_phalanx;
+cVar_t	*r_effectscale_rail;
+cVar_t	*r_effectscale_smoke;
+cVar_t	*r_effectscale_spark;
+cVar_t	*r_glow;
+cVar_t	*r_glow_explo;
+cVar_t	*r_glow_rail;
+cVar_t	*r_glow_spark;
+cVar_t	*r_glow_bfg;
+cVar_t	*r_glow_ion;
+cVar_t	*r_glow_autoscale;
+cVar_t	*r_max_batch_particles;
 cVar_t	*r_fullbright;
 cVar_t	*r_hwGamma;
 cVar_t	*r_lerpmodels;
@@ -383,7 +400,17 @@ static vidMode_t r_vidModes[] = {
 	{"Mode 11: 2048 x 1536",		2048,	1536,	11},
 
 	{"Mode 12: 1280 x 800 (ws)",	1280,	800,	12},
-	{"Mode 13: 1440 x 900 (ws)",	1440,	900,	13}
+	{"Mode 13: 1440 x 900 (ws)",	1440,	900,	13},
+
+	{"Mode 14: 1280 x 720 (ws)",	1280,	720,	14},
+	{"Mode 15: 1366 x 768 (ws)",	1366,	768,	15},
+	{"Mode 16: 1600 x 900 (ws)",	1600,	900,	16},
+	{"Mode 17: 1920 x 1080 (ws)",	1920,	1080,	17},
+	{"Mode 18: 2560 x 1440 (ws)",	2560,	1440,	18},
+	{"Mode 19: 3840 x 2160 (ws)",	3840,	2160,	19},
+	{"Mode 20: 2560 x 1080 (uw)",	2560,	1080,	20},
+	{"Mode 21: 3440 x 1440 (uw)",	3440,	1440,	21},
+	{"Mode 22: 5120 x 1440 (uw)",	5120,	1440,	22}
 };
 
 #define NUM_VIDMODES (sizeof (r_vidModes) / sizeof (r_vidModes[0]))
@@ -1205,6 +1232,23 @@ static void R_Register (void)
 	r_flareFade			= Cvar_Register ("r_flareFade",			"7",			CVAR_ARCHIVE);
 	r_flareSize			= Cvar_Register ("r_flareSize",			"40",			CVAR_ARCHIVE);
 	r_fontScale			= Cvar_Register ("r_fontScale",			"1",			CVAR_ARCHIVE);
+	r_effectscale		= Cvar_Register ("r_effectscale",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_blaster	= Cvar_Register ("r_effectscale_blaster",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_bfg		= Cvar_Register ("r_effectscale_bfg",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_explo	= Cvar_Register ("r_effectscale_explo",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_ion		= Cvar_Register ("r_effectscale_ion",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_phalanx	= Cvar_Register ("r_effectscale_phalanx",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_rail		= Cvar_Register ("r_effectscale_rail",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_smoke	= Cvar_Register ("r_effectscale_smoke",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_spark	= Cvar_Register ("r_effectscale_spark",	"1.0",			CVAR_ARCHIVE);
+	r_glow				= Cvar_Register ("r_glow",			"0",			CVAR_ARCHIVE);
+	r_glow_explo		= Cvar_Register ("r_glow_explo",		"1.0",			CVAR_ARCHIVE);
+	r_glow_rail			= Cvar_Register ("r_glow_rail",		"1.0",			CVAR_ARCHIVE);
+	r_glow_spark		= Cvar_Register ("r_glow_spark",		"1.0",			CVAR_ARCHIVE);
+	r_glow_bfg			= Cvar_Register ("r_glow_bfg",		"1.2",			CVAR_ARCHIVE);
+	r_glow_ion			= Cvar_Register ("r_glow_ion",		"1.0",			CVAR_ARCHIVE);
+	r_glow_autoscale	= Cvar_Register ("r_glow_autoscale",	"0",			CVAR_ARCHIVE);
+	r_max_batch_particles	= Cvar_Register ("r_max_batch_particles",	"4096",			CVAR_ARCHIVE);
 	r_fullbright		= Cvar_Register ("r_fullbright",		"0",			CVAR_CHEAT);
 	r_hwGamma			= Cvar_Register ("r_hwGamma",			"0",			CVAR_ARCHIVE|CVAR_LATCH_VIDEO);
 	r_lerpmodels		= Cvar_Register ("r_lerpmodels",		"1",			0);
@@ -1359,6 +1403,12 @@ rInit_t R_Init (void)
 		return R_INIT_MODE_FAIL;
 	}
 
+	// Some drivers can leave an error queued during mode/context transitions.
+	// Clear it here so later GL_CheckForError() calls report only real init errors.
+	while (qglGetError () != GL_NO_ERROR) {
+		;
+	}
+
 	// Vendor string
 	ri.vendorString = qglGetString (GL_VENDOR);
 	Com_Printf (0, "GL_VENDOR: %s\n", ri.vendorString);
@@ -1474,20 +1524,33 @@ rInit_t R_Init (void)
 
 	// Set the default state
 	RB_SetDefaultState ();
+	GL_CheckForError ("RB_SetDefaultState");
 
 	// Sub-system init
 	R_ImageInit ();
+	GL_CheckForError ("R_ImageInit");
 	R_ProgramInit ();
+	GL_CheckForError ("R_ProgramInit");
 	R_MaterialInit ();
+	GL_CheckForError ("R_MaterialInit");
 	R_FontInit ();
+	GL_CheckForError ("R_FontInit");
 	R_MediaInit ();
+	GL_CheckForError ("R_MediaInit");
 	R_ModelInit ();
+	GL_CheckForError ("R_ModelInit");
 	R_EntityInit ();
+	GL_CheckForError ("R_EntityInit");
 	R_WorldInit ();
+	GL_CheckForError ("R_WorldInit");
 	R_PolyInit ();
+	GL_CheckForError ("R_PolyInit");
 	R_DecalInit ();
+	GL_CheckForError ("R_DecalInit");
 	RB_Init ();
+	GL_CheckForError ("RB_Init");
 	RF_2DInit ();
+	GL_CheckForError ("RF_2DInit");
 
 	// Check for gl errors
 	GL_CheckForError ("R_Init");

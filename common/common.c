@@ -25,7 +25,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "common.h"
 #include <setjmp.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 jmp_buf	abortframe;		// an ERR_DROP occured, exit the entire frame
+
+// Stub for MinGW compatibility
+int __intrinsic_setjmpex(jmp_buf env) { return setjmp(env); }
 
 cVar_t	nullCvar;
 
@@ -333,7 +340,8 @@ NO_RETURN void Com_Error (comError_t code, char *fmt, ...)
 	default:
 	case ERR_FATAL:
 #ifdef _WIN32
-		DebugBreak();
+		if (IsDebuggerPresent())
+			DebugBreak();
 #endif
 
 		SV_ServerShutdown (Q_VarArgs ("Server fatal crashed: %s\n", msg), qFalse, qTrue);
@@ -736,6 +744,46 @@ void Com_Init (int argc, char **argv)
 	timescale		= Cvar_Register ("timescale",		"1",	CVAR_CHEAT);
 	fixedtime		= Cvar_Register ("fixedtime",		"0",	CVAR_CHEAT);
 	logfile			= Cvar_Register ("logfile",			"0",	0);
+
+#ifndef DEDICATED_ONLY
+	// EGL is an engine and expects Quake II base game data.
+	// If pak0.pak is missing, fail fast with a helpful message rather than
+	// continuing into a very noisy startup full of missing media warnings.
+	if (!dedicated->intVal && FS_FileExists ("pak0.pak") == -1) {
+		if (developer->intVal) {
+			Com_Printf (PRNT_WARNING, "Quake II base game data not found (missing pak0.pak). Developer mode bypass enabled; expect missing sounds/textures.\n");
+		}
+		else {
+			Com_Printf (PRNT_ERROR,
+				"Quake II base game data not found.\n"
+				"\n"
+				"EGL does not ship Quake II's commercial assets.\n"
+				"Expected to find:\n"
+				"  %s/pak0.pak\n"
+				"\n"
+				"Fix:\n"
+				"  - Copy pak0.pak from your Quake II install into that folder.\n"
+				"  - Or launch EGL with: +set basedir <path-to-quake2>\n"
+				"\n"
+				"(To bypass this check for engine development: +set developer 1)\n",
+				FS_Gamedir ());
+
+			Com_Error (ERR_FATAL,
+				"Quake II base game data not found.\n"
+				"\n"
+				"EGL does not ship Quake II's commercial assets.\n"
+				"Expected to find:\n"
+				"  %s/pak0.pak\n"
+				"\n"
+				"Fix:\n"
+				"  - Copy pak0.pak from your Quake II install into that folder.\n"
+				"  - Or launch EGL with: +set basedir <path-to-quake2>\n"
+				"\n"
+				"(To bypass this check for engine development: +set developer 1)\n",
+				FS_Gamedir ());
+		}
+	}
+#endif
 
 #ifndef DEDICATED_ONLY
 	if (dedicated->intVal) {

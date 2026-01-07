@@ -24,6 +24,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "rf_local.h"
 
+#define EGL_GLOW_PROG_RAIL	"programs/egl_glow_rail.fp"
+#define EGL_GLOW_PROG_EXPLO	"programs/egl_glow_explo.fp"
+#define EGL_GLOW_PROG_SPARK	"programs/egl_glow_spark.fp"
+#define EGL_GLOW_PROG_BFG	"programs/egl_glow_bfg.fp"
+#define EGL_GLOW_PROG_ION	"programs/egl_glow_ion.fp"
+
 #define MAX_PROGRAMS		256
 #define MAX_PROGRAM_HASH	(MAX_PROGRAMS/4)
 
@@ -568,4 +574,106 @@ void R_ProgramShutdown (void)
 
 	size = Mem_FreePool (ri.programSysPool);
 	Com_Printf (0, "...releasing %u bytes...\n", size);
+}
+
+
+/*
+===============
+R_ProgramSetEmissiveIntensity
+
+Sets a per-draw emissive scalar for ARB fragment programs.
+
+We use local parameter #9 in the fragment program:
+ - xyz: emissive intensity multiplier
+ - w:   alpha multiplier (kept at 1)
+
+This should be called only while a fragment program is bound/enabled.
+===============
+*/
+void R_ProgramSetEmissiveIntensity (float intensity)
+{
+	if (!qglProgramLocalParameter4fARB)
+		return;
+
+	qglProgramLocalParameter4fARB (GL_FRAGMENT_PROGRAM_ARB, 9, intensity, intensity, intensity, 1.0f);
+}
+
+
+/*
+===============
+R_ProgramGetGlowIntensity
+
+Detects whether a program is one of the EGL glow fragment programs and, if so,
+computes the effective glow intensity.
+
+Intensity is clamped to the user-facing range [0..2].
+===============
+*/
+qBool R_ProgramGetGlowIntensity (const program_t *program, float *outIntensity)
+{
+	float base;
+	float mult;
+	float intensity;
+
+	if (!outIntensity) {
+		return qFalse;
+	}
+
+	*outIntensity = 0.0f;
+
+	if (!program || !program->name[0]) {
+		return qFalse;
+	}
+
+	// Base intensity (0..2)
+	base = 0.0f;
+	if (r_glow)
+		base = r_glow->floatVal;
+	base = clamp (base, 0.0f, 2.0f);
+
+	// Family multiplier (defaults to 1)
+	mult = 1.0f;
+	if (!Q_stricmp (program->name, EGL_GLOW_PROG_RAIL)) {
+		if (r_glow_rail)
+			mult = r_glow_rail->floatVal;
+	}
+	else if (!Q_stricmp (program->name, EGL_GLOW_PROG_EXPLO)) {
+		if (r_glow_explo)
+			mult = r_glow_explo->floatVal;
+	}
+	else if (!Q_stricmp (program->name, EGL_GLOW_PROG_SPARK)) {
+		if (r_glow_spark)
+			mult = r_glow_spark->floatVal;
+	}
+	else if (!Q_stricmp (program->name, EGL_GLOW_PROG_BFG)) {
+		if (r_glow_bfg)
+			mult = r_glow_bfg->floatVal;
+	}
+	else if (!Q_stricmp (program->name, EGL_GLOW_PROG_ION)) {
+		if (r_glow_ion)
+			mult = r_glow_ion->floatVal;
+	}
+	else {
+		return qFalse;
+	}
+
+	mult = clamp (mult, 0.0f, 2.0f);
+	intensity = base * mult;
+
+	// Optional autoscale: when enabled, and when r_effectscale is in auto mode (0),
+	// multiply intensity by a resolution-derived factor.
+	if (r_glow_autoscale && r_glow_autoscale->intVal) {
+		if (r_effectscale && r_effectscale->floatVal == 0.0f && vid_width && vid_height) {
+			const float w = (float)vid_width->intVal;
+			const float h = (float)vid_height->intVal;
+			if (w > 0.0f && h > 0.0f) {
+				const float autoScale = sqrtf ((w * h) / (1024.0f * 768.0f));
+				if (autoScale > 0.0f)
+					intensity *= autoScale;
+			}
+		}
+	}
+
+	*outIntensity = clamp (intensity, 0.0f, 2.0f);
+	return qTrue;
 }

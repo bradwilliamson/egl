@@ -715,7 +715,7 @@ void CL_InputInit (void)
 	cl_yawspeed			= Cvar_Register ("cl_yawspeed",			"140",		0);
 	cl_pitchspeed		= Cvar_Register ("cl_pitchspeed",		"150",		0);
 
-	cl_run				= Cvar_Register ("cl_run",				"0",		CVAR_ARCHIVE);
+	cl_run				= Cvar_Register ("cl_run",				"1",		CVAR_ARCHIVE);
 
 	cl_anglespeedkey	= Cvar_Register ("cl_anglespeedkey",	"1.5",		0);
 

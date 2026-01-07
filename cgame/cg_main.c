@@ -27,108 +27,109 @@ cgState_t	cg;
 cgMedia_t	cgMedia;
 uiMedia_t	uiMedia;
 
-cVar_t	*cg_advInfrared;
-cVar_t	*cg_brassTime;
-cVar_t	*cg_decals;
-cVar_t	*cg_decalBurnLife;
-cVar_t	*cg_decalFadeTime;
-cVar_t	*cg_decalLife;
-cVar_t	*cg_decalLOD;
-cVar_t	*cg_decalMax;
-cVar_t	*cg_mapEffects;
-cVar_t	*cl_add_particles;
-cVar_t	*cg_particleCulling;
-cVar_t	*cg_particleGore;
-cVar_t	*cg_particleMax;
-cVar_t	*cg_particleShading;
-cVar_t	*cg_particleSmokeLinger;
-cVar_t	*cg_railCoreRed;
-cVar_t	*cg_railCoreGreen;
-cVar_t	*cg_railCoreBlue;
-cVar_t	*cg_railSpiral;
-cVar_t	*cg_railSpiralRed;
-cVar_t	*cg_railSpiralGreen;
-cVar_t	*cg_railSpiralBlue;
-cVar_t	*cg_thirdPerson;
-cVar_t	*cg_thirdPersonAngle;
-cVar_t	*cg_thirdPersonClip;
-cVar_t	*cg_thirdPersonDist;
+#ifdef CGAME_HARD_LINKED
+extern cVar_t	*cg_advInfrared;
+extern cVar_t	*cg_brassTime;
+extern cVar_t	*cg_decals;
+extern cVar_t	*cg_decalBurnLife;
+extern cVar_t	*cg_decalFadeTime;
+extern cVar_t	*cg_decalLife;
+extern cVar_t	*cg_decalLOD;
+extern cVar_t	*cg_decalMax;
+extern cVar_t	*cg_mapEffects;
+extern cVar_t	*cl_add_particles;
+extern cVar_t	*cg_particleCulling;
+extern cVar_t	*cg_particleGore;
+extern cVar_t	*cg_particleMax;
+extern cVar_t	*cg_particleShading;
+extern cVar_t	*cg_particleSmokeLinger;
+extern cVar_t	*cg_railCoreRed;
+extern cVar_t	*cg_railCoreGreen;
+extern cVar_t	*cg_railCoreBlue;
+extern cVar_t	*cg_railSpiral;
+extern cVar_t	*cg_railSpiralRed;
+extern cVar_t	*cg_railSpiralGreen;
+extern cVar_t	*cg_railSpiralBlue;
+extern cVar_t	*cg_thirdPerson;
+extern cVar_t	*cg_thirdPersonAngle;
+extern cVar_t	*cg_thirdPersonClip;
+extern cVar_t	*cg_thirdPersonDist;
 
-cVar_t	*cl_explorattle;
-cVar_t	*cl_explorattle_scale;
-cVar_t	*cl_footsteps;
-cVar_t	*cl_gun;
-cVar_t	*cl_noskins;
-cVar_t	*cl_predict;
-cVar_t	*cl_showmiss;
-cVar_t	*cl_vwep;
+extern cVar_t	*cl_explorattle;
+extern cVar_t	*cl_explorattle_scale;
+extern cVar_t	*cl_footsteps;
+extern cVar_t	*cl_gun;
+extern cVar_t	*cl_noskins;
+extern cVar_t	*cl_predict;
+extern cVar_t	*cl_showmiss;
+extern cVar_t	*cl_vwep;
 
-cVar_t	*gender_auto;
-cVar_t	*gender;
-cVar_t	*hand;
-cVar_t	*skin;
+extern cVar_t	*gender_auto;
+extern cVar_t	*gender;
+extern cVar_t	*hand;
+extern cVar_t	*skin;
 
-cVar_t	*glm_advgas;
-cVar_t	*glm_advstingfire;
-cVar_t	*glm_blobtype;
-cVar_t	*glm_bluestingfire;
-cVar_t	*glm_flashpred;
-cVar_t	*glm_flwhite;
-cVar_t	*glm_forcecache;
-cVar_t	*glm_jumppred;
-cVar_t	*glm_showclass;
+extern cVar_t	*glm_advgas;
+extern cVar_t	*glm_advstingfire;
+extern cVar_t	*glm_blobtype;
+extern cVar_t	*glm_bluestingfire;
+extern cVar_t	*glm_flashpred;
+extern cVar_t	*glm_flwhite;
+extern cVar_t	*glm_forcecache;
+extern cVar_t	*glm_jumppred;
+extern cVar_t	*glm_showclass;
 
-cVar_t	*cl_testblend;
-cVar_t	*cl_testentities;
-cVar_t	*cl_testlights;
-cVar_t	*cl_testparticles;
+extern cVar_t	*cl_testblend;
+extern cVar_t	*cl_testentities;
+extern cVar_t	*cl_testlights;
+extern cVar_t	*cl_testparticles;
 
-cVar_t	*r_hudScale;
-cVar_t	*r_fontScale;
+extern cVar_t	*r_hudScale;
 
-cVar_t	*crosshair;
-cVar_t	*ch_alpha;
-cVar_t	*ch_pulse;
-cVar_t	*ch_scale;
-cVar_t	*ch_red;
-cVar_t	*ch_green;
-cVar_t	*ch_blue;
-cVar_t	*ch_xOffset;
-cVar_t	*ch_yOffset;
+extern cVar_t	*crosshair;
+extern cVar_t	*ch_alpha;
+extern cVar_t	*ch_pulse;
+extern cVar_t	*ch_scale;
+extern cVar_t	*ch_red;
+extern cVar_t	*ch_green;
+extern cVar_t	*ch_blue;
+extern cVar_t	*ch_xOffset;
+extern cVar_t	*ch_yOffset;
 
-cVar_t	*cl_showfps;
-cVar_t	*cl_showping;
-cVar_t	*cl_showtime;
+extern cVar_t	*cl_showfps;
+extern cVar_t	*cl_showping;
+extern cVar_t	*cl_showtime;
 
-cVar_t	*con_chatHud;
-cVar_t	*con_chatHudLines;
-cVar_t	*con_chatHudPosX;
-cVar_t	*con_chatHudPosY;
-cVar_t	*con_chatHudShadow;
-cVar_t	*con_notifyfade;
-cVar_t	*con_notifylarge;
-cVar_t	*con_notifylines;
-cVar_t	*con_notifytime;
-cVar_t	*con_alpha;
-cVar_t	*con_clock;
-cVar_t	*con_drop;
-cVar_t	*con_scroll;
+extern cVar_t	*con_chatHud;
+extern cVar_t	*con_chatHudLines;
+extern cVar_t	*con_chatHudPosX;
+extern cVar_t	*con_chatHudPosY;
+extern cVar_t	*con_chatHudShadow;
+extern cVar_t	*con_notifyfade;
+extern cVar_t	*con_notifylarge;
+extern cVar_t	*con_notifylines;
+extern cVar_t	*con_notifytime;
+extern cVar_t	*con_alpha;
+extern cVar_t	*con_clock;
+extern cVar_t	*con_drop;
+extern cVar_t	*con_scroll;
 
-cVar_t	*scr_conspeed;
-cVar_t	*scr_centertime;
-cVar_t	*scr_showpause;
-cVar_t	*scr_hudalpha;
+extern cVar_t	*scr_conspeed;
+extern cVar_t	*scr_centertime;
+extern cVar_t	*scr_showpause;
+extern cVar_t	*scr_hudalpha;
 
-cVar_t	*scr_netgraph;
-cVar_t	*scr_timegraph;
-cVar_t	*scr_debuggraph;
-cVar_t	*scr_graphheight;
-cVar_t	*scr_graphscale;
-cVar_t	*scr_graphshift;
-cVar_t	*scr_graphalpha;
+extern cVar_t	*scr_netgraph;
+extern cVar_t	*scr_timegraph;
+extern cVar_t	*scr_debuggraph;
+extern cVar_t	*scr_graphheight;
+extern cVar_t	*scr_graphscale;
+extern cVar_t	*scr_graphshift;
+extern cVar_t	*scr_graphalpha;
 
-cVar_t	*viewsize;
-cVar_t	*gl_polyblend;
+extern cVar_t	*viewsize;
+extern cVar_t	*gl_polyblend;
+#endif
 
 // ====================================================================
 
@@ -402,10 +403,21 @@ static void CG_RegisterMain (void)
 	r_hudScale				= cgi.Cvar_Register ("r_hudScale",				"1",			CVAR_ARCHIVE);
 	r_fontScale				= cgi.Cvar_Register ("r_fontScale",				"1",			CVAR_ARCHIVE);
 
+	// Effect scaling (renderer owns r_effectscale; registering here caches the pointers for cgame)
+	r_effectscale			= cgi.Cvar_Register ("r_effectscale",			"1.0",			CVAR_ARCHIVE);
+	r_effectscale_blaster	= cgi.Cvar_Register ("r_effectscale_blaster",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_bfg		= cgi.Cvar_Register ("r_effectscale_bfg",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_explo	= cgi.Cvar_Register ("r_effectscale_explo",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_ion		= cgi.Cvar_Register ("r_effectscale_ion",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_phalanx	= cgi.Cvar_Register ("r_effectscale_phalanx",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_rail		= cgi.Cvar_Register ("r_effectscale_rail",		"1.0",			CVAR_ARCHIVE);
+	r_effectscale_smoke	= cgi.Cvar_Register ("r_effectscale_smoke",	"1.0",			CVAR_ARCHIVE);
+	r_effectscale_spark	= cgi.Cvar_Register ("r_effectscale_spark",	"1.0",			CVAR_ARCHIVE);
+
 	if (cg.currGameMod == GAME_MOD_DDAY)
-		crosshair			= cgi.Cvar_Register ("crosshair",				"0",			CVAR_ARCHIVE|CVAR_CHEAT);
+		crosshair			= cgi.Cvar_Register ("crosshair",				"2",			CVAR_ARCHIVE|CVAR_CHEAT);
 	else
-		crosshair			= cgi.Cvar_Register ("crosshair",				"0",			CVAR_ARCHIVE);
+		crosshair			= cgi.Cvar_Register ("crosshair",				"2",			CVAR_ARCHIVE);
 	ch_alpha				= cgi.Cvar_Register ("ch_alpha",				"1",			CVAR_ARCHIVE);
 	ch_pulse				= cgi.Cvar_Register ("ch_pulse",				"1",			CVAR_ARCHIVE);
 	ch_scale				= cgi.Cvar_Register ("ch_scale",				"1",			CVAR_ARCHIVE);

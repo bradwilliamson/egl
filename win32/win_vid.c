@@ -256,6 +256,44 @@ LRESULT CALLBACK MainWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 		Com_Printf (0, "WM_MOUSE H WHEEL\n");
 		goto end;
 
+	case WM_INPUT: {
+		// Raw Input: prefer raw deltas for mouse movement and wheel
+		UINT dwSize = 0;
+		if (GetRawInputData ((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof (RAWINPUTHEADER)) == (UINT)-1)
+			break;
+
+		LPBYTE lpb = (LPBYTE) malloc (dwSize);
+		if (!lpb)
+			break;
+
+		if (GetRawInputData ((HRAWINPUT)lParam, RID_INPUT, lpb, &dwSize, sizeof (RAWINPUTHEADER)) == dwSize) {
+			RAWINPUT *raw = (RAWINPUT *)lpb;
+			if (raw->header.dwType == RIM_TYPEMOUSE) {
+				int x = raw->data.mouse.lLastX;
+				int y = raw->data.mouse.lLastY;
+				if (x || y) {
+					CL_MoveMouse (x, y);
+				}
+
+				// Wheel (vertical) handled here if present
+				if (raw->data.mouse.usButtonFlags & RI_MOUSE_WHEEL) {
+					SHORT wheel = (SHORT) raw->data.mouse.usButtonData;
+					if (wheel > 0) {
+						Key_Event (K_MWHEELUP, qTrue, sys_winInfo.msgTime);
+						Key_Event (K_MWHEELUP, qFalse, sys_winInfo.msgTime);
+					}
+					else {
+						Key_Event (K_MWHEELDOWN, qTrue, sys_winInfo.msgTime);
+						Key_Event (K_MWHEELDOWN, qFalse, sys_winInfo.msgTime);
+					}
+				}
+			}
+		}
+
+		free (lpb);
+		goto end;
+	}
+
 	case WM_HOTKEY:
 		return 0;
 
@@ -515,7 +553,7 @@ void VID_Init (refConfig_t *outConfig)
 	// Create the video variables so we know how to start the graphics drivers
 	vid_xpos		= Cvar_Register ("vid_xpos",			"3",	CVAR_ARCHIVE);
 	vid_ypos		= Cvar_Register ("vid_ypos",			"22",	CVAR_ARCHIVE);
-	vid_fullscreen	= Cvar_Register ("vid_fullscreen",		"0",	CVAR_ARCHIVE|CVAR_LATCH_VIDEO);
+	vid_fullscreen	= Cvar_Register ("vid_fullscreen",		"1",	CVAR_ARCHIVE|CVAR_LATCH_VIDEO);
 
 	win_noalttab	= Cvar_Register ("win_noalttab",		"0",	CVAR_ARCHIVE);
 

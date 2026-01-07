@@ -152,9 +152,9 @@ void CL_WriteDemoPlayerstate (frame_t *from, frame_t *to, netMsg_t *msg)
 
 	// Write the rest of the playerState_t
 	if (psFlags & PS_VIEWOFFSET) {
-		MSG_WriteChar (msg, ps->viewOffset[0]*4);
-		MSG_WriteChar (msg, ps->viewOffset[1]*4);
-		MSG_WriteChar (msg, ps->viewOffset[2]*4);
+		MSG_WriteChar (msg, bound (-128, (int)(ps->viewOffset[0]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->viewOffset[1]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->viewOffset[2]*4), 127));
 	}
 
 	if (psFlags & PS_VIEWANGLES) {
@@ -164,9 +164,9 @@ void CL_WriteDemoPlayerstate (frame_t *from, frame_t *to, netMsg_t *msg)
 	}
 
 	if (psFlags & PS_KICKANGLES) {
-		MSG_WriteChar (msg, ps->kickAngles[0]*4);
-		MSG_WriteChar (msg, ps->kickAngles[1]*4);
-		MSG_WriteChar (msg, ps->kickAngles[2]*4);
+		MSG_WriteChar (msg, bound (-128, (int)(ps->kickAngles[0]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->kickAngles[1]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->kickAngles[2]*4), 127));
 	}
 
 	if (psFlags & PS_WEAPONINDEX) {
@@ -175,12 +175,12 @@ void CL_WriteDemoPlayerstate (frame_t *from, frame_t *to, netMsg_t *msg)
 
 	if (psFlags & PS_WEAPONFRAME) {
 		MSG_WriteByte (msg, ps->gunFrame);
-		MSG_WriteChar (msg, ps->gunOffset[0]*4);
-		MSG_WriteChar (msg, ps->gunOffset[1]*4);
-		MSG_WriteChar (msg, ps->gunOffset[2]*4);
-		MSG_WriteChar (msg, ps->gunAngles[0]*4);
-		MSG_WriteChar (msg, ps->gunAngles[1]*4);
-		MSG_WriteChar (msg, ps->gunAngles[2]*4);
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunOffset[0]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunOffset[1]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunOffset[2]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunAngles[0]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunAngles[1]*4), 127));
+		MSG_WriteChar (msg, bound (-128, (int)(ps->gunAngles[2]*4), 127));
 	}
 
 	if (psFlags & PS_BLEND) {

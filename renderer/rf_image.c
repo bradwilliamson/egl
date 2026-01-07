@@ -28,10 +28,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #ifdef _WIN32
 # include "../include/jpeg/jpeglib.h"
-# include "../include/zlibpng/png.h"
+//# include "../include/zlibpng/png.h"
+# define CINTERFACE
+# define COBJMACROS
+# include <windows.h>
+# include <objbase.h>
+# include <wincodec.h>
 #else
 # include <jpeglib.h>
-# include <png.h>
+//# include <png.h>
 #endif
 
 #define MAX_IMAGE_HASH			(MAX_IMAGES/4)
@@ -270,82 +275,8 @@ ala Vic
 */
 static void R_LoadJPG (char *name, byte **pic, int *width, int *height)
 {
-    int		fileLen, components;
-    byte	*img, *scan, *buffer, *dummy;
-    struct	jpeg_error_mgr			jerr;
-    struct	jpeg_decompress_struct	cinfo;
-	uint32	i;
-
-	if (pic)
-		*pic = NULL;
-
-	// Load the file
-	fileLen = FS_LoadFile (name, (void **)&buffer, NULL);
-	if (!buffer || fileLen <= 0)
-		return;
-
-	// Parse the file
-	cinfo.err = jpeg_std_error (&jerr);
-	jerr.error_exit = jpeg_d_error_exit;
-
-	jpeg_create_decompress (&cinfo);
-
-	jpeg_mem_src (&cinfo, buffer, fileLen);
-	jpeg_read_header (&cinfo, TRUE);
-
-	jpeg_start_decompress (&cinfo);
-
-	components = cinfo.output_components;
-    if (components != 3 && components != 1) {
-		Com_DevPrintf (PRNT_WARNING, "R_LoadJPG: Bad jpeg components '%s' (%d)\n", name, components);
-		jpeg_destroy_decompress (&cinfo);
-		FS_FreeFile (buffer);
-		return;
-	}
-
-	if (cinfo.output_width <= 0 || cinfo.output_height <= 0) {
-		Com_DevPrintf (PRNT_WARNING, "R_LoadJPG: Bad jpeg dimensions on '%s' (%d x %d)\n", name, cinfo.output_width, cinfo.output_height);
-		jpeg_destroy_decompress (&cinfo);
-		FS_FreeFile (buffer);
-		return;
-	}
-
-	if (width)
-		*width = cinfo.output_width;
-	if (height)
-		*height = cinfo.output_height;
-
-	img = Mem_PoolAlloc (cinfo.output_width * cinfo.output_height * 4, ri.imageSysPool, r_imageAllocTag);
-	dummy = Mem_PoolAlloc (cinfo.output_width * components, ri.imageSysPool, r_imageAllocTag);
-
-	if (pic)
-		*pic = img;
-
-	while (cinfo.output_scanline < cinfo.output_height) {
-		scan = dummy;
-		if (!jpeg_read_scanlines (&cinfo, &scan, 1)) {
-			Com_Printf (PRNT_WARNING, "Bad jpeg file %s\n", name);
-			jpeg_destroy_decompress (&cinfo);
-			Mem_Free (dummy);
-			FS_FreeFile (buffer);
-			return;
-		}
-
-		if (components == 1) {
-			for (i=0 ; i<cinfo.output_width ; i++, img+=4)
-				img[0] = img[1] = img[2] = *scan++;
-		}
-		else {
-			for (i=0 ; i<cinfo.output_width ; i++, img+=4, scan += 3)
-				img[0] = scan[0], img[1] = scan[1], img[2] = scan[2];
-		}
-	}
-
-    jpeg_finish_decompress (&cinfo);
-    jpeg_destroy_decompress (&cinfo);
-
-    Mem_Free (dummy);
-	FS_FreeFile (buffer);
+	// Disabled
+	return;
 }
 
 
@@ -357,39 +288,8 @@ R_WriteJPG
 
 static void R_WriteJPG (FILE *f, byte *buffer, int width, int height, int quality)
 {
-	int			offset, w3;
-	struct		jpeg_compress_struct	cinfo;
-	struct		jpeg_error_mgr			jerr;
-	byte		*s;
-
-	// Initialise the jpeg compression object
-	cinfo.err = jpeg_std_error (&jerr);
-	jpeg_create_compress (&cinfo);
-	jpeg_stdio_dest (&cinfo, f);
-
-	// Setup jpeg parameters
-	cinfo.image_width = width;
-	cinfo.image_height = height;
-	cinfo.in_color_space = JCS_RGB;
-	cinfo.input_components = 3;
-	cinfo.progressive_mode = TRUE;
-
-	jpeg_set_defaults (&cinfo);
-	jpeg_set_quality (&cinfo, quality, TRUE);
-	jpeg_start_compress (&cinfo, qTrue);	// start compression
-	jpeg_write_marker (&cinfo, JPEG_COM, (byte *) "EGL v" EGL_VERSTR, (uint32) strlen ("EGL v" EGL_VERSTR));
-
-	// Feed scanline data
-	w3 = cinfo.image_width * 3;
-	offset = w3 * cinfo.image_height - w3;
-	while (cinfo.next_scanline < cinfo.image_height) {
-		s = &buffer[offset - (cinfo.next_scanline * w3)];
-		jpeg_write_scanlines (&cinfo, &s, 1);
-	}
-
-	// Finish compression
-	jpeg_finish_compress (&cinfo);
-	jpeg_destroy_compress (&cinfo);
+	// Disabled
+	return;
 }
 
 /*
@@ -512,6 +412,7 @@ static void R_LoadPCX (char *name, byte **pic, byte **palette, int *width, int *
 ==============================================================================
 */
 
+/*
 typedef struct pngBuf_s {
 	byte	*buffer;
 	size_t	pos;
@@ -523,6 +424,7 @@ void PngReadFunc (png_struct *Png, png_bytep buf, png_size_t size)
 	memcpy (buf,PngFileBuffer->buffer + PngFileBuffer->pos, size);
 	PngFileBuffer->pos += size;
 }
+*/
 
 /*
 =============
@@ -531,117 +433,155 @@ R_LoadPNG
 */
 static void R_LoadPNG (char *name, byte **pic, int *width, int *height, int *samples)
 {
-	png_structp		png_ptr;
-	png_infop		info_ptr;
-	png_infop		end_info;
-	png_bytepp		row_pointers;
-	png_bytep		pic_ptr;
-	size_t			rowbytes, fileLen, i;
-	pngBuf_t		PngFileBuffer = { NULL, 0 };
+	int			fileLen;
+	byte			*fileBuf;
+	HRESULT			hr;
+	HRESULT			hrCo;
+	qBool			didCoInit;
+	IWICImagingFactory	*factory;
+	IWICStream		*stream;
+	IWICBitmapDecoder	*decoder;
+	IWICBitmapFrameDecode	*frame;
+	IWICFormatConverter	*converter;
+	UINT			w, h;
+	WICRect			rc;
+	UINT			stride;
+	UINT			bufSize;
+	byte			*out;
+	int			pixelCount;
+	int			i;
 
 	if (pic)
 		*pic = NULL;
-
-	// Load the file
-	fileLen = FS_LoadFile (name, (void **)&PngFileBuffer.buffer, NULL);
-	if (!PngFileBuffer.buffer || fileLen <= 0)
-		return;
-
-	// Parse the PNG file
-	if ((png_check_sig (PngFileBuffer.buffer, 8)) == 0) {
-		Com_Printf (PRNT_WARNING, "R_LoadPNG: Not a PNG file: %s\n", name);
-		FS_FreeFile (PngFileBuffer.buffer);
-		return;
-	}
-
-	PngFileBuffer.pos = 0;
-
-	png_ptr = png_create_read_struct (PNG_LIBPNG_VER_STRING, NULL,  NULL, NULL);
-	if (!png_ptr) {
-		Com_Printf (PRNT_WARNING, "R_LoadPNG: Bad PNG file: %s\n", name);
-		FS_FreeFile (PngFileBuffer.buffer);
-		return;
-	}
-
-	info_ptr = png_create_info_struct (png_ptr);
-	if (!info_ptr) {
-		png_destroy_read_struct (&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
-		Com_Printf (PRNT_WARNING, "R_LoadPNG: Bad PNG file: %s\n", name);
-		FS_FreeFile (PngFileBuffer.buffer);
-		return;
-	}
-	
-	end_info = png_create_info_struct (png_ptr);
-	if (!end_info) {
-		png_destroy_read_struct (&png_ptr, &info_ptr, (png_infopp)NULL);
-		Com_Printf (PRNT_WARNING, "R_LoadPNG: Bad PNG file: %s\n", name);
-		FS_FreeFile (PngFileBuffer.buffer);
-		return;
-	}
-
-	png_set_read_fn (png_ptr, (png_voidp)&PngFileBuffer, (png_rw_ptr)PngReadFunc);
-
-	png_read_info (png_ptr, info_ptr);
-
-	// Color
-	if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_PALETTE) {
-		png_set_palette_to_rgb (png_ptr);
-		png_read_update_info (png_ptr, info_ptr);
-	}
-
-	if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGB)
-		png_set_filler (png_ptr, 0xFF, PNG_FILLER_AFTER);
-
-	if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_GRAY && png_get_bit_depth(png_ptr, info_ptr) < 8)
-		png_set_expand_gray_1_2_4_to_8 (png_ptr);
-
-	if (png_get_valid (png_ptr, info_ptr, PNG_INFO_tRNS))
-		png_set_tRNS_to_alpha (png_ptr);
-
-	if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_GRAY || png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_GRAY_ALPHA)
-		png_set_gray_to_rgb (png_ptr);
-
-	if (png_get_bit_depth(png_ptr, info_ptr) == 16)
-		png_set_strip_16 (png_ptr);
-
-	if (png_get_bit_depth(png_ptr, info_ptr) < 8)
-        png_set_packing (png_ptr);
-
-	png_read_update_info (png_ptr, info_ptr);
-
-	rowbytes = png_get_rowbytes (png_ptr, info_ptr);
-
-	if (!png_get_channels(png_ptr, info_ptr)) {
-		png_destroy_read_struct (&png_ptr, &info_ptr, (png_infopp)NULL);
-		Com_Printf (PRNT_WARNING, "R_LoadPNG: Bad PNG file: %s\n", name);
-		FS_FreeFile (PngFileBuffer.buffer);
-	}
-
-	pic_ptr = Mem_PoolAlloc (png_get_image_height(png_ptr, info_ptr) * rowbytes, ri.imageSysPool, r_imageAllocTag);
-	if (pic)
-		*pic = pic_ptr;
-
-	row_pointers = Mem_PoolAlloc (sizeof (png_bytep) * png_get_image_height(png_ptr, info_ptr), ri.imageSysPool, r_imageAllocTag);
-
-	for (i=0 ; i<png_get_image_height(png_ptr, info_ptr) ; i++) {
-		row_pointers[i] = pic_ptr;
-		pic_ptr += rowbytes;
-	}
-
-	png_read_image (png_ptr, row_pointers);
-
 	if (width)
-		*width = png_get_image_width(png_ptr, info_ptr);
+		*width = 0;
 	if (height)
-		*height = png_get_image_height(png_ptr, info_ptr);
+		*height = 0;
 	if (samples)
-		*samples = png_get_channels(png_ptr, info_ptr);
+		*samples = 0;
 
-	png_read_end (png_ptr, end_info);
-	png_destroy_read_struct (&png_ptr, &info_ptr, &end_info);
+	// Load the file into memory first (works with pkz/pak paths)
+	fileBuf = NULL;
+	fileLen = FS_LoadFile (name, (void **)&fileBuf, NULL);
+	if (!fileBuf || fileLen <= 0)
+		return;
 
-	Mem_Free (row_pointers);
-	FS_FreeFile (PngFileBuffer.buffer);
+	factory = NULL;
+	stream = NULL;
+	decoder = NULL;
+	frame = NULL;
+	converter = NULL;
+	didCoInit = qFalse;
+
+	hrCo = CoInitializeEx (NULL, COINIT_MULTITHREADED);
+	if (hrCo == S_OK || hrCo == S_FALSE)
+		didCoInit = qTrue;
+
+	hr = CoCreateInstance (&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, &IID_IWICImagingFactory, (LPVOID *)&factory);
+	if (FAILED (hr) || !factory)
+		goto cleanup;
+
+	hr = IWICImagingFactory_CreateStream (factory, &stream);
+	if (FAILED (hr) || !stream)
+		goto cleanup;
+
+	hr = IWICStream_InitializeFromMemory (stream, (BYTE *)fileBuf, (DWORD)fileLen);
+	if (FAILED (hr))
+		goto cleanup;
+
+	hr = IWICImagingFactory_CreateDecoderFromStream (factory, (IStream *)stream, NULL, WICDecodeMetadataCacheOnLoad, &decoder);
+	if (FAILED (hr) || !decoder)
+		goto cleanup;
+
+	hr = IWICBitmapDecoder_GetFrame (decoder, 0, &frame);
+	if (FAILED (hr) || !frame)
+		goto cleanup;
+
+	hr = IWICImagingFactory_CreateFormatConverter (factory, &converter);
+	if (FAILED (hr) || !converter)
+		goto cleanup;
+
+	// Prefer RGBA, fall back to BGRA and swap
+	hr = IWICFormatConverter_Initialize (converter,
+		(IWICBitmapSource *)frame,
+		&GUID_WICPixelFormat32bppRGBA,
+		WICBitmapDitherTypeNone,
+		NULL,
+		0.0,
+		WICBitmapPaletteTypeCustom);
+	if (FAILED (hr)) {
+		hr = IWICFormatConverter_Initialize (converter,
+			(IWICBitmapSource *)frame,
+			&GUID_WICPixelFormat32bppBGRA,
+			WICBitmapDitherTypeNone,
+			NULL,
+			0.0,
+			WICBitmapPaletteTypeCustom);
+		if (FAILED (hr))
+			goto cleanup;
+	}
+
+	hr = IWICBitmapSource_GetSize ((IWICBitmapSource *)converter, &w, &h);
+	if (FAILED (hr) || !w || !h)
+		goto cleanup;
+
+	stride = w * 4;
+	bufSize = stride * h;
+
+	out = Mem_PoolAlloc (bufSize, ri.imageSysPool, r_imageAllocTag);
+	rc.X = 0;
+	rc.Y = 0;
+	rc.Width = (INT)w;
+	rc.Height = (INT)h;
+
+	hr = IWICBitmapSource_CopyPixels ((IWICBitmapSource *)converter, &rc, stride, bufSize, (BYTE *)out);
+	if (FAILED (hr)) {
+		Mem_Free (out);
+		goto cleanup;
+	}
+
+	// If we ended up with BGRA, swap R/B
+	// (If RGBA was used, this will be a no-op because converter keeps the requested format.)
+	// We detect BGRA by re-querying the pixel format.
+	{
+		WICPixelFormatGUID fmt;
+		if (SUCCEEDED (IWICFormatConverter_GetPixelFormat (converter, &fmt))) {
+			if (IsEqualGUID (&fmt, &GUID_WICPixelFormat32bppBGRA)) {
+				pixelCount = (int)(w * h);
+				for (i = 0; i < pixelCount; i++) {
+					byte b = out[i*4 + 0];
+					out[i*4 + 0] = out[i*4 + 2];
+					out[i*4 + 2] = b;
+				}
+			}
+		}
+	}
+
+	if (pic)
+		*pic = out;
+	if (width)
+		*width = (int)w;
+	if (height)
+		*height = (int)h;
+	if (samples)
+		*samples = 4;
+
+cleanup:
+	if (converter)
+		IWICFormatConverter_Release (converter);
+	if (frame)
+		IWICBitmapFrameDecode_Release (frame);
+	if (decoder)
+		IWICBitmapDecoder_Release (decoder);
+	if (stream)
+		IWICStream_Release (stream);
+	if (factory)
+		IWICImagingFactory_Release (factory);
+
+	if (didCoInit)
+		CoUninitialize ();
+
+	FS_FreeFile (fileBuf);
 }
 
 
@@ -652,44 +592,8 @@ R_PNGScreenShot
 */
 static void R_WritePNG (FILE *f, byte *buffer, int width, int height)
 {
-	int			i;
-	png_structp	png_ptr;
-	png_infop	info_ptr;
-	png_bytep	*row_pointers;
-
-	png_ptr = png_create_write_struct (PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!png_ptr) {
-		Com_Printf (PRNT_WARNING, "R_WritePNG: LibPNG Error!\n");
-		return;
-	}
-
-	info_ptr = png_create_info_struct(png_ptr);
-	if (!info_ptr) {
-		png_destroy_write_struct (&png_ptr, (png_infopp)NULL);
-		Com_Printf (PRNT_WARNING, "R_WritePNG: LibPNG Error!\n");
-		return;
-	}
-
-	png_init_io (png_ptr, f);
-
-	png_set_IHDR (png_ptr, info_ptr, width, height, 8, PNG_COLOR_TYPE_RGB,
-				PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-
-	png_set_compression_level (png_ptr, PNG_Z_DEFAULT_COMPRESSION);
-	png_set_compression_mem_level (png_ptr, 9);
-
-	png_write_info (png_ptr, info_ptr);
-
-	row_pointers = Mem_PoolAlloc (height * sizeof (png_bytep), ri.imageSysPool, IMGTAG_DEFAULT);
-	for (i=0 ; i<height ; i++)
-		row_pointers[i] = buffer + (height - 1 - i) * 3 * width;
-
-	png_write_image (png_ptr, row_pointers);
-	png_write_end (png_ptr, info_ptr);
-
-	png_destroy_write_struct (&png_ptr, &info_ptr);
-
-	Mem_Free (row_pointers);
+	// Disabled
+	return;
 }
 
 /*

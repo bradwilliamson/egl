@@ -223,6 +223,7 @@ qBool In_GetKeyState (keyNum_t keyNum)
 // mouse variables
 cVar_t		*m_accel;
 cVar_t		*in_mouse;
+cVar_t		*in_rawinput;
 
 static qBool	in_mInitialized;
 static qBool	in_mActive;			// qFalse when not focus app
@@ -316,6 +317,9 @@ static void IN_ActivateMouse (void)
 	SetCapture (sys_winInfo.hWnd);
 	ClipCursor (&wRect);
 	while (ShowCursor (FALSE) >= 0) ;
+
+	// Enable Raw Input (for mouse movement deltas) if requested
+	IN_EnableRawInput ();
 }
 
 
@@ -345,7 +349,8 @@ static void IN_DeactivateMouse (void)
 	if (!in_mActive)
 		return;
 
-	// Release capture and show the cursor
+	// Disable Raw Input and release capture/show cursor
+	IN_DisableRawInput ();
 	in_mActive = qFalse;
 	ClipCursor (NULL);
 	ReleaseCapture ();
@@ -378,6 +383,62 @@ static void IN_StartupMouse (void)
 		Com_DevPrintf (0, "...mouse found\n");
 	else
 		Com_Printf (PRNT_ERROR, "...mouse not found\n");
+}
+
+
+/* Runtime raw input state */
+static qBool in_mRawActive = qFalse;
+
+/*
+===========
+IN_EnableRawInput
+===========
+*/
+void IN_EnableRawInput (void)
+{
+	if (!in_rawinput || !in_rawinput->intVal)
+		return;
+
+	RAWINPUTDEVICE rid;
+	rid.usUsagePage = 0x01; // Generic Desktop Controls
+	rid.usUsage = 0x02;     // Mouse
+	rid.dwFlags = 0;        // do not suppress legacy messages (buttons) to preserve current handling
+	rid.hwndTarget = sys_winInfo.hWnd;
+
+	if (!RegisterRawInputDevices (&rid, 1, sizeof (rid))) {
+		Com_Printf (PRNT_WARNING, "WARNING: RegisterRawInputDevices failed (%u)\n", GetLastError ());
+		in_mRawActive = qFalse;
+	}
+	else {
+		in_mRawActive = qTrue;
+		Com_Printf (0, "Raw Input: enabled\n");
+	}
+}
+
+/*
+===========
+IN_DisableRawInput
+===========
+*/
+void IN_DisableRawInput (void)
+{
+	if (!in_mRawActive)
+		return;
+
+	RAWINPUTDEVICE rid;
+	rid.usUsagePage = 0x01;
+	rid.usUsage = 0x02;
+	rid.dwFlags = RIDEV_REMOVE;
+	rid.hwndTarget = NULL;
+
+	RegisterRawInputDevices (&rid, 1, sizeof (rid));
+	in_mRawActive = qFalse;
+	Com_Printf (0, "Raw Input: disabled\n");
+}
+
+qBool IN_RawInputActive (void)
+{
+	return in_mRawActive;
 }
 
 
@@ -418,6 +479,11 @@ void IN_MouseMove (userCmd_t *cmd)
 	int		xMove, yMove;
 
 	if (!in_mActive)
+		return;
+
+	// If raw input is active we receive raw deltas via WM_INPUT and should skip
+	// the legacy cursor-centering movement code to avoid double-deltas.
+	if (IN_RawInputActive ())
 		return;
 
 	// Find cursor position
@@ -1014,6 +1080,8 @@ void IN_Init (void)
 
 	// Init
 	IN_StartupMouse ();
+	/* register raw input toggle cvar */
+	in_rawinput = Cvar_Register ("in_rawinput", "1", CVAR_ARCHIVE);
 	IN_StartupJoystick ();
 	IN_StartupKeyboard ();
 

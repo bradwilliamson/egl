@@ -1158,6 +1158,7 @@ static void FS_AddGameDirectory (char *dir, char *gamePath)
 	fsPath_t	*search;
 	mPack_t		*pak;
 	mPack_t		*pkz;
+	qBool		hasPak0;
 
 	if (fs_developer->intVal)
 		Com_Printf (0, "FS_AddGameDirectory: adding \"%s\"\n", dir);
@@ -1173,16 +1174,24 @@ static void FS_AddGameDirectory (char *dir, char *gamePath)
 	fs_searchPaths = search;
 
 	// Add any pak files in the format pak0.pak pak1.pak, ...
+	hasPak0 = qFalse;
 	for (i=0 ; i<10 ; i++) {
 		Q_snprintfz (searchName, sizeof (searchName), "%s/pak%i.pak", dir, i);
 		pak = FS_LoadPAK (searchName, qFalse);
 		if (!pak)
 			continue;
+		if (i == 0)
+			hasPak0 = qTrue;
 		search = Mem_PoolAlloc (sizeof (fsPath_t), com_fileSysPool, 0);
 		search->package = pak;
 		search->next = fs_searchPaths;
 		fs_searchPaths = search;
 	}
+
+	// Helpful hint: EGL content packs don't include the Quake II base media.
+	// If pak0.pak is missing from baseq2, users will see lots of missing sounds/textures.
+	if (fs_developer->intVal && !hasPak0 && !Q_stricmp (gamePath, BASE_MODDIRNAME))
+		Com_Printf (PRNT_WARNING, "FS_AddGameDirectory: '%s' is missing pak0.pak (Quake II base game data). Expect missing sounds/textures.\n", dir);
 
 	// Add the rest of the *.pak files
 	if (!fs_defaultPaks->intVal) {
@@ -1211,6 +1220,22 @@ static void FS_AddGameDirectory (char *dir, char *gamePath)
 	}
 
 	// Load *.pkz files
+	numPacks = Sys_FindFiles (dir, "*.pkz", packFiles, FS_MAX_PAKS, 0, qFalse, qTrue, qFalse);
+
+	for (i=0 ; i<numPacks ; i++) {
+		pkz = FS_LoadPKZ (packFiles[i], qTrue);
+		if (!pkz)
+			continue;
+		search = Mem_PoolAlloc (sizeof (fsPath_t), com_fileSysPool, 0);
+		Q_strncpyz (search->pathName, dir, sizeof (search->pathName));
+		Q_strncpyz (search->gamePath, gamePath, sizeof (search->gamePath));
+		search->package = pkz;
+		search->next = fs_searchPaths;
+		fs_searchPaths = search;
+	}
+
+	FS_FreeFileList (packFiles, numPacks);
+
 	numPacks = Sys_FindFiles (dir, "*/*.pkz", packFiles, FS_MAX_PAKS, 0, qFalse, qTrue, qFalse);
 
 	for (i=0 ; i<numPacks ; i++) {
@@ -1228,6 +1253,22 @@ static void FS_AddGameDirectory (char *dir, char *gamePath)
 	FS_FreeFileList (packFiles, numPacks);
 
 	// Load *.pk3 files
+	numPacks = Sys_FindFiles (dir, "*.pk3", packFiles, FS_MAX_PAKS, 0, qFalse, qTrue, qFalse);
+
+	for (i=0 ; i<numPacks ; i++) {
+		pkz = FS_LoadPKZ (packFiles[i], qTrue);
+		if (!pkz)
+			continue;
+		search = Mem_PoolAlloc (sizeof (fsPath_t), com_fileSysPool, 0);
+		Q_strncpyz (search->pathName, dir, sizeof (search->pathName));
+		Q_strncpyz (search->gamePath, gamePath, sizeof (search->gamePath));
+		search->package = pkz;
+		search->next = fs_searchPaths;
+		fs_searchPaths = search;
+	}
+
+	FS_FreeFileList (packFiles, numPacks);
+
 	numPacks = Sys_FindFiles (dir, "*/*.pk3", packFiles, FS_MAX_PAKS, 0, qFalse, qTrue, qFalse);
 
 	for (i=0 ; i<numPacks ; i++) {
