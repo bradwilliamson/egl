@@ -190,3 +190,13 @@ void SndImp_Submit (void)
 {
     Snd_SDL_Submit ();
 }
+
+void SndImp_Activate (qBool active)
+{
+    // Keep the engine's global active flag and AL state updated.
+    Snd_Activate (active);
+
+    // For the SDL DMA backend, pausing the device prevents needless callback churn.
+    if (s_sdl_dev)
+        SDL_PauseAudioDevice (s_sdl_dev, active ? 0 : 1);
+}

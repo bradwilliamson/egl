@@ -28,6 +28,33 @@ static cVar_t *gl_swap_interval = NULL;
 static qBool vid_queueRestart = qFalse;
 static qBool vid_isActive = qFalse;
 
+void SDL2_SetMouseGrab (qBool grab)
+{
+    if (!sdl_window)
+        return;
+
+    SDL_SetRelativeMouseMode (grab ? SDL_TRUE : SDL_FALSE);
+    SDL_SetWindowGrab (sdl_window, grab ? SDL_TRUE : SDL_FALSE);
+}
+
+void SDL2_OnWindowResized (int width, int height)
+{
+    if (width <= 0 || height <= 0)
+        return;
+
+    ri.config.vidWidth = width;
+    ri.config.vidHeight = height;
+
+    cls.refConfig.vidWidth = width;
+    cls.refConfig.vidHeight = height;
+}
+
+void GLimp_AppActivate (qBool active)
+{
+    // Kept minimal; input layer handles focus-based grab/pause logic.
+    (void)active;
+}
+
 /* Helper: set SDL swap interval based on cvars */
 static void SDL_GLimp_SetSwapInterval (int interval)
 {
@@ -105,6 +132,9 @@ qBool GLimp_AttemptMode (qBool fullScreen, int width, int height)
     if (!sdl_window)
         return qFalse;
 
+    ri.config.vidBitDepth = 0;
+    ri.config.vidFrequency = 0;
+
     if (fullScreen) {
         /* find best matching mode on the current display */
         int displayIndex = SDL_GetWindowDisplayIndex (sdl_window);
@@ -131,6 +161,9 @@ qBool GLimp_AttemptMode (qBool fullScreen, int width, int height)
             SDL_SetWindowDisplayMode (sdl_window, &bestMode);
             if (SDL_SetWindowFullscreen (sdl_window, SDL_WINDOW_FULLSCREEN) == 0) {
                 SDL_SetWindowSize (sdl_window, width, height);
+				ri.config.vidFullScreen = qTrue;
+				ri.config.vidWidth = width;
+				ri.config.vidHeight = height;
                 return qTrue;
             }
         }
@@ -140,6 +173,10 @@ qBool GLimp_AttemptMode (qBool fullScreen, int width, int height)
     /* Windowed mode */
     SDL_SetWindowFullscreen (sdl_window, 0);
     SDL_SetWindowSize (sdl_window, width, height);
+
+	ri.config.vidFullScreen = qFalse;
+	ri.config.vidWidth = width;
+	ri.config.vidHeight = height;
     return qTrue;
 }
 
