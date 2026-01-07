@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #ifndef __UNIX_GLIMP_H__
 #define __UNIX_GLIMP_H__
 
+#include <stdio.h>
+#include "../shared/shared.h"
+
 #define APPLICATION "EGL" EGL_VERSTR
 
 typedef struct glxState_s {

@@ -11,6 +11,7 @@ TODO: flesh out full mode enumeration/setting, input hookup, and gamma control.
 #include "../client/cl_local.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
+#include <limits.h>
 
 static SDL_Window *sdl_window = NULL;
 static SDL_GLContext sdl_glctx = NULL;
