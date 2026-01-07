@@ -22,7 +22,20 @@ jobs:
       - name: Build project (SDL2)
         run: |
           set -o pipefail
-          make -f Makefile.unix USE_SDL2=1 2>&1 | tee build.log
+          echo "Workspace: $(pwd)"
+          ls -la || true
+          echo "gcc --version:"; gcc --version || true
+          echo "pkg-config sdl2 --modversion:"; pkg-config --modversion sdl2 || true
+          if [ -f Makefile.unix ]; then
+            echo "Using Makefile.unix"
+            make -f Makefile.unix USE_SDL2=1 2>&1 | tee build.log
+          elif [ -f Makefile ]; then
+            echo "Using Makefile"
+            make USE_SDL2=1 2>&1 | tee build.log
+          else
+            echo "ERROR: no Makefile found" 2>&1 | tee build.log
+            exit 2
+          fi
 
       - name: Show build log tail (on failure)
         if: failure()
@@ -33,7 +46,8 @@ jobs:
       - name: Compile SDL2 smoke test
         if: success()
         run: |
-          gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` || gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2
+          echo "Compiling smoke test"
+          gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` 2>&1 | tee ci/compile_smoke.log || (gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2 2>&1 | tee -a ci/compile_smoke.log)
 
       - name: Run SDL2 smoke test (dummy audio)
         if: success()
