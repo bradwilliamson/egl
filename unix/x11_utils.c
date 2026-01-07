@@ -215,17 +215,13 @@ qBool SCR_SetGammaRamp (uint16 *ramp)
 		g->blue[i] = ramp[i + (size<<1)];
 	}
 
-	if (!XRRSetCrtcGamma (x11display.dpy, crtc, g)) {
-		XFree (g);
-		return qFalse;
-	}
-
+	XRRSetCrtcGamma (x11display.dpy, crtc, g);
 	XFree (g);
 	return qTrue;
 }
 
 
-#else // XF86VMODE
+#elif defined(XF86VMODE)
 
 static int xf86_vidmodes_suported = 0;
 static XF86VidModeModeInfo **xf86_vidmodes;
@@ -374,7 +370,7 @@ qBool SCR_SetGammaRamp (uint16 *ramp)
 	return XF86VidModeSetGammaRamp (x11display.dpy, x11display.scr, stride, ramp, ramp + stride, ramp + (stride << 1))?qTrue:qFalse;
 }
 
-#else // XF86VMODE
+#else // no video mode extension available
 
 /*
 =============
@@ -753,4 +749,5 @@ int X11_ScanUnmappedKeys (void)
       }
     }
   }
+  return kc;
 }
