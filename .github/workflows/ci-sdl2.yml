@@ -45,7 +45,8 @@ jobs:
         run: |
           echo "---- build.log errors (first 200 matches) ----"
           if [ -f build.log ]; then
-            grep -n -i "error\|fatal error" build.log | sed -n '1,200p' || true
+            # Match actual compiler-style errors, not symbols like Com_Error
+            grep -n -E -i "(^|: )[[:space:]]*(fatal error:|error:)" build.log | sed -n '1,200p' || true
             echo "---- build.log warnings (first 200 matches) ----"
             grep -n -i "warning" build.log | sed -n '1,200p' || true
             echo "---- build.log tail (last 300 lines) ----"
@@ -60,7 +61,8 @@ jobs:
         if: success()
         run: |
           echo "Compiling smoke test"
-          gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` 2>&1 | tee ci/compile_smoke.log || (gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2 2>&1 | tee -a ci/compile_smoke.log)
+          set -o pipefail
+          gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` 2>&1 | tee ci/compile_smoke.log || (set -o pipefail; gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2 2>&1 | tee -a ci/compile_smoke.log)
 
       - name: Run SDL2 smoke test (dummy audio)
         if: success()
@@ -75,6 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sdl2-ci-logs
+          if-no-files-found: warn
           path: |
             ci/sdl2_smoke
             build.log
