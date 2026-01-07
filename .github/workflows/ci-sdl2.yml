@@ -40,11 +40,17 @@ jobs:
             exit 2
           fi
 
-      - name: Show build log tail (on failure)
-        if: failure()
+      - name: Show build log (tail)
+        if: always()
         run: |
-          echo "--- tail of build.log ---"
-          tail -n 200 build.log || true
+          echo "---- build.log tail (last 300 lines) ----"
+          if [ -f build.log ]; then
+            tail -n 300 build.log || true
+          else
+            echo "No build.log present; listing workspace:"
+            ls -la || true
+          fi
+          echo "---- end build.log tail ----"
 
       - name: Compile SDL2 smoke test
         if: success()
