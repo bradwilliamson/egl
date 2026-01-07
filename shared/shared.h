@@ -104,12 +104,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #  ifdef NDEBUG
 #   ifdef __i386__
 #    define CPUSTRING		"i386"
+#   elif defined(__x86_64__) || defined(__amd64__)
+#    define CPUSTRING		"x64"
+#   elif defined(__aarch64__)
+#    define CPUSTRING		"aarch64"
 #   elif defined(__alpha__)
 #    define CPUSTRING		"AXP"
 #   endif
 #  else // NDEBUG
 #   ifdef __i386__
 #    define CPUSTRING		"i386 Debug"
+#   elif defined(__x86_64__) || defined(__amd64__)
+#    define CPUSTRING		"x64 Debug"
+#   elif defined(__aarch64__)
+#    define CPUSTRING		"aarch64 Debug"
 #   elif defined(__alpha__)
 #    define CPUSTRING		"AXP Debug"
 #   endif
@@ -133,12 +141,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #  ifdef NDEBUG
 #   ifdef __i386__
 #    define CPUSTRING		"i386"
+#   elif defined(__x86_64__) || defined(__amd64__)
+#    define CPUSTRING		"x64"
+#   elif defined(__aarch64__)
+#    define CPUSTRING		"aarch64"
 #   elif defined(__alpha__)
 #    define CPUSTRING		"AXP"
 #   endif
 #  else // NDEBUG
 #   ifdef __i386__
 #    define CPUSTRING		"i386 Debug"
+#   elif defined(__x86_64__) || defined(__amd64__)
+#    define CPUSTRING		"x64 Debug"
+#   elif defined(__aarch64__)
+#    define CPUSTRING		"aarch64 Debug"
 #   elif defined(__alpha__)
 #    define CPUSTRING		"AXP Debug"
 #   endif
@@ -705,12 +721,12 @@ qBool	Info_Validate (char *s);
 ==============================================================================
 */
 
-float		(*LittleFloat) (float f);
-int			(*LittleLong) (int l);
-int16		(*LittleShort) (int16 s);
-float		(*BigFloat) (float f);
-int			(*BigLong) (int l);
-int16		(*BigShort) (int16 s);
+extern float		(*LittleFloat) (float f);
+extern int		(*LittleLong) (int l);
+extern int16		(*LittleShort) (int16 s);
+extern float		(*BigFloat) (float f);
+extern int		(*BigLong) (int l);
+extern int16		(*BigShort) (int16 s);
 
 void		Swap_Init (void);
 
