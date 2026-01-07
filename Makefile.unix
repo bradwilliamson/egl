@@ -33,7 +33,10 @@ SO_CFLAGS = $(CFLAGS_COMMON) -fPIC
 SO_LDFLAGS = -shared
 
 # Source sets
-SHARED_SRC = $(wildcard shared/*.c)
+# Explicitly list shared sources to avoid wildcard issues
+SHARED_SRC = shared/byteswap.c shared/infostrings.c shared/m_angles.c shared/m_bounds.c \
+	shared/m_flash.c shared/m_mat3.c shared/m_mat4.c shared/m_plane.c shared/m_quat.c \
+	shared/mathlib.c shared/mersennetwister.c shared/shared.c shared/string.c
 COMMON_SRC = $(filter-out common/zlib_stubs.c, $(wildcard common/*.c)) $(SHARED_SRC)
 CLIENT_SRC = $(wildcard client/*.c)
 CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
@@ -80,7 +83,7 @@ all: client modules
 
 client: egl
 
-egl: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ) $(UNIX_CLIENT_OBJ)
+egl: $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ) $(UNIX_CLIENT_OBJ) $(COMMON_OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS_CLIENT)
 
 dedicated: eglded
