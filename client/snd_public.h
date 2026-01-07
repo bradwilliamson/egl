@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // snd_public.h
 //
 
+#ifndef __SND_PUBLIC_H__
+#define __SND_PUBLIC_H__
+
 #include "snd_cd.h"
 
 void	Snd_Activate (qBool active);
@@ -54,3 +57,5 @@ void	Snd_Update (refDef_t *rd);
 */
 
 void	SndImp_Activate (qBool active);
+
+#endif // __SND_PUBLIC_H__

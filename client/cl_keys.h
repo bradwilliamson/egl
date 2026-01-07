@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // cl_keys.h
 //
 
+#ifndef __CL_KEYS_H__
+#define __CL_KEYS_H__
+
 #define MAXCMDLINE	256
 
 // FIXME: this is only here for ../unix/x11_utils.c
@@ -62,3 +65,4 @@ void		Key_SetBinding (keyNum_t keyNum, char *binding);
 void		Key_WriteBindings (FILE *f);
 
 void		Key_Init (void);
+#endif // __CL_KEYS_H__

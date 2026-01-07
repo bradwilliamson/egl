@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Public GUI header, shown to the rest of the client.
 //
 
+#ifndef __GUI_PUBLIC_H__
+#define __GUI_PUBLIC_H__
+
 /*
 =============================================================================
 
@@ -81,3 +84,4 @@ qBool		GUIVar_GetVecValue (guiVar_t *var, vec4_t dest);
 void		GUIVar_SetFloatValue (guiVar_t *var, float value);
 void		GUIVar_SetStrValue (guiVar_t *var, char *value);
 void		GUIVar_SetVecValue (guiVar_t *var, vec4_t value);
+#endif // __GUI_PUBLIC_H__

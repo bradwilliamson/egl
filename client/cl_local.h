@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Primary header for client
 //
 
+#ifndef __CL_LOCAL_H__
+#define __CL_LOCAL_H__
+
 #ifdef DEDICATED_ONLY
 # error You should not be including this file in a dedicated server build
 #endif // DEDICATED_ONLY
@@ -491,3 +494,5 @@ void		IN_Activate (qBool active);
 void		VID_CheckChanges (refConfig_t *outConfig);
 void		VID_Init (refConfig_t *outConfig);
 void		VID_Shutdown (void);
+
+#endif // __CL_LOCAL_H__

@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Private sound functions
 //
 
+#ifndef __SND_LOCAL_H__
+#define __SND_LOCAL_H__
+
 #include "../client/cl_local.h"
 
 #define MAX_SFX			(MAX_CS_SOUNDS*2)
@@ -231,7 +234,9 @@ void	ALSnd_Shutdown (void);
 =============================================================================
 */
 
-qBool	SndImp_Init (void);			// initializes cycling through a DMA buffer and returns information on it
+qBool	SndImp_Init (void);
+
+#endif // __SND_LOCAL_H__			// initializes cycling through a DMA buffer and returns information on it
 int		SndImp_GetDMAPos (void);	// gets the current DMA position
 void	SndImp_BeginPainting (void);
 void	SndImp_Submit (void);

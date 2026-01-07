@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // gui_local.h
 //
 
+#ifndef __GUI_LOCAL_H__
+#define __GUI_LOCAL_H__
+
 #include "cl_local.h"
 
 #define MAX_GUIS			512				// Maximum in-memory GUIs
@@ -119,7 +122,7 @@ typedef struct guiVar_s {
 } guiVar_t;
 
 void		GUIVar_Init (void);
-void		GUIVar_Shutdown (void);
+#endif // __GUI_LOCAL_H__void		GUIVar_Shutdown (void);
 
 /*
 =============================================================================
