@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_material.h
 //
 
+#ifndef __RF_MATERIAL_H__
+#define __RF_MATERIAL_H__
+
 /*
 =============================================================================
 
@@ -48,6 +51,7 @@ enum { // matPassFlags_t
 	MAT_PASS_NOCOLORARRAY		= 1 << 8,
 	MAT_PASS_FRAGMENTPROGRAM	= 1 << 9,
 	MAT_PASS_VERTEXPROGRAM		= 1 << 10,
+	MAT_PASS_EMISSIVE			= 1 << 11,
 };
 
 // Material pass alphaFunc functions
@@ -349,3 +353,4 @@ material_t	*R_RegisterTextureVertex (char *name);
 
 void		R_MaterialInit (void);
 void		R_MaterialShutdown (void);
+#endif // __RF_MATERIAL_H__

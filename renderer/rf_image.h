@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_image.h
 //
 
+#ifndef __RF_IMAGE_H__
+#define __RF_IMAGE_H__
+
 /*
 =============================================================================
 
@@ -122,3 +125,6 @@ void	R_UpdateGammaRamp (void);
 
 void	R_ImageInit (void);
 void	R_ImageShutdown (void);
+
+#endif // __RF_IMAGE_H__
+

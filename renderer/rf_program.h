@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_program.h
 //
 
+#ifndef __RF_PROGRAM_H__
+#define __RF_PROGRAM_H__
+
 /*
 =============================================================================
 
@@ -44,5 +47,12 @@ typedef struct program_s {
 
 program_t	*R_RegisterProgram (char *name, qBool fragProg);
 
+void		R_ProgramSetEmissiveIntensity (float intensity);
+
+// Returns qTrue if this is one of the EGL glow fragment programs.
+// If so, writes the effective emissive intensity (0..2) into outIntensity.
+qBool		R_ProgramGetGlowIntensity (const program_t *program, float *outIntensity);
+
 void		R_ProgramInit (void);
 void		R_ProgramShutdown (void);
+#endif // __RF_PROGRAM_H__
