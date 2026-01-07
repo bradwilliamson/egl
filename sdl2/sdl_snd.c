@@ -8,6 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Sound cvars - normally in unix_snd_main.c but we need them here for SDL2 build */
+cVar_t *s_bits;
+cVar_t *s_speed;
+cVar_t *s_channels;
+
 static cVar_t *s_sdl_device;
 static cVar_t *s_sdl_buffer_ms; /* desired buffer size in milliseconds */
 
@@ -50,6 +55,11 @@ static void SDLAudioCallback (void *userdata, Uint8 *stream, int len)
 
 qBool Snd_SDL_Init (void)
 {
+    /* Register sound cvars if not already done */
+    if (!s_bits) s_bits = Cvar_Register ("s_bits", "16", CVAR_ARCHIVE);
+    if (!s_speed) s_speed = Cvar_Register ("s_speed", "44100", CVAR_ARCHIVE);
+    if (!s_channels) s_channels = Cvar_Register ("s_channels", "2", CVAR_ARCHIVE);
+
     int bits = s_bits ? s_bits->intVal : 16;
     int channels = s_channels ? s_channels->intVal : 2;
     int speed = 0;
