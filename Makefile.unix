@@ -1,0 +1,113 @@
+# Makefile.unix - EGL Quake II (Linux/Unix)
+#
+# Notes:
+# - Builds an X11/GLX client binary: ./egl
+# - Builds a dedicated server binary: ./eglded
+# - Builds game modules as ELF shared objects placed in ./baseq2:
+#     baseq2/game.so, baseq2/eglcgame.so
+# - Runtime deps: X11, OpenGL, OpenAL (optional but recommended), zlib, minizip
+
+CC ?= cc
+
+# Common flags
+WARN_CFLAGS = -Wall -Wno-deprecated-declarations -Wno-unused-function
+OPT_CFLAGS ?= -O2
+
+CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing \
+	-I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./unix
+
+# Link flags
+# -lX11 and -lGL are required for the client.
+# -lXrandr is added to support modern mode switching and gamma on X11.
+# -ldl is required for dlopen() (modules + OpenAL loader).
+LDFLAGS_COMMON = -ldl -lm -lz -lminizip
+LDFLAGS_CLIENT = -lX11 -lGL -lXrandr $(LDFLAGS_COMMON)
+
+# Dedicated build (no renderer/client)
+DED_CFLAGS = $(OPT_CFLAGS) $(WARN_CFLAGS) -DDEDICATED_ONLY -fno-strict-aliasing \
+	-I. -I./include -I./shared -I./server -I./unix
+DED_LDFLAGS = $(LDFLAGS_COMMON)
+
+# Shared-object build (game + cgame)
+SO_CFLAGS = $(CFLAGS_COMMON) -fPIC
+SO_LDFLAGS = -shared
+
+# Source sets
+SHARED_SRC = $(wildcard shared/*.c)
+COMMON_SRC = $(filter-out common/zlib_stubs.c, $(wildcard common/*.c)) $(SHARED_SRC)
+CLIENT_SRC = $(wildcard client/*.c)
+CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
+GAME_SRC = $(wildcard game/*.c)
+RENDERER_SRC = $(wildcard renderer/*.c)
+SERVER_SRC = $(filter-out server/server_stubs.c, $(wildcard server/*.c))
+
+# Unix platform sources
+# Intentionally exclude unix_snd_sdl.c and unix_snd_alsa.c (they are marked FIXME / may require extra deps).
+#ifdef USE_SDL2
+UNIX_CLIENT_SRC = \
+	sdl2/sdl_main.c sdl2/sdl_glimp.c sdl2/sdl_input.c \
+	sdl2/sdl_snd.c
+CFLAGS_COMMON += -DHAVE_SDL2
+LDFLAGS_CLIENT += -lSDL2 -lSDL2main
+#else
+UNIX_CLIENT_SRC = \
+	unix/unix_main.c unix/unix_console.c unix/unix_udp.c \
+	unix/unix_glimp.c unix/x11_main.c unix/x11_utils.c \
+	unix/unix_snd_main.c unix/unix_snd_oss.c unix/unix_snd_cd.c
+#endif
+
+UNIX_DED_SRC = unix/unix_main.c unix/unix_console.c unix/unix_udp.c
+
+# Object lists
+COMMON_OBJ = $(COMMON_SRC:.c=.o)
+CLIENT_OBJ = $(CLIENT_SRC:.c=.o)
+CGAME_OBJ = $(CGAME_SRC:.c=.o)
+GAME_OBJ = $(GAME_SRC:.c=.o)
+RENDERER_OBJ = $(RENDERER_SRC:.c=.o)
+SERVER_OBJ = $(SERVER_SRC:.c=.o)
+UNIX_CLIENT_OBJ = $(UNIX_CLIENT_SRC:.c=.o)
+UNIX_DED_OBJ = $(UNIX_DED_SRC:.c=.o)
+
+# Output names (Unix module loader expects game.so / eglcgame.so on non-i386)
+CGAME_SO = eglcgame.so
+GAME_SO = game.so
+
+.PHONY: all client dedicated modules clean
+
+all: client modules
+
+client: egl
+
+egl: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ) $(UNIX_CLIENT_OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS_CLIENT)
+
+dedicated: eglded
+
+eglded: $(COMMON_OBJ) $(SERVER_OBJ) $(UNIX_DED_OBJ)
+	$(CC) -o $@ $^ $(DED_LDFLAGS)
+
+modules: $(CGAME_SO) $(GAME_SO)
+	@mkdir -p baseq2
+	@cp -f $(CGAME_SO) baseq2/$(CGAME_SO)
+	@cp -f $(GAME_SO) baseq2/$(GAME_SO)
+
+$(CGAME_SO): $(CGAME_OBJ:.o=.pic.o) $(SHARED_SRC:.c=.pic.o)
+	$(CC) -o $@ $(SO_LDFLAGS) $^
+
+$(GAME_SO): $(GAME_OBJ:.o=.pic.o) $(SHARED_SRC:.c=.pic.o)
+	$(CC) -o $@ $(SO_LDFLAGS) $^
+
+# Pattern rules
+%.o: %.c
+	$(CC) $(CFLAGS_COMMON) -c $< -o $@
+
+%.pic.o: %.c
+	$(CC) $(SO_CFLAGS) -c $< -o $@
+
+# Dedicated-only objects reuse the common pattern rule; unix sources will see DEDICATED_ONLY via compile-time macros in code.
+# (If you need stricter separation later, split obj dirs.)
+
+clean:
+	rm -f egl eglded $(CGAME_SO) $(GAME_SO)
+	find . -name '*.o' -type f -delete
+	find . -name '*.pic.o' -type f -delete

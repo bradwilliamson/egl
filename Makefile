@@ -1,0 +1,101 @@
+# Basic Makefile for EGL Quake 2 on MinGW (Windows)
+CC = gcc
+
+# Optional SDL2 backend (set USE_SDL2=1 to enable)
+ifdef USE_SDL2
+CFLAGS += -DHAVE_SDL2
+LDFLAGS += -lSDL2
+SDL2_SOURCES = sdl2/sdl_glimp.c sdl2/sdl_input.c sdl2/sdl_snd.c sdl2/sdl_main.c
+else
+SDL2_SOURCES =
+endif
+CFLAGS = -DWIN32 -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
+LDFLAGS = -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip
+
+# Optional debug build (symbols + no optimization) for diagnosing crashes.
+DBG_CFLAGS = -DWIN32 -m64 -O0 -g3 -fno-omit-frame-pointer -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
+DBG_LDFLAGS = -m64 -mwindows -Wl,--pdb=egl.pdb -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip
+
+# Dedicated server build (no renderer/client). Uses separate objects to avoid flag collisions.
+DED_OBJDIR = build/dedicated
+DED_CFLAGS = -DWIN32 -DDEDICATED_ONLY -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./server -I./win32
+DED_LDFLAGS = -m64 -mwindows -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lz -lminizip
+
+# Module naming follows win32/win_main.c (LIBARCH = x64 for this toolchain)
+LIBARCH = x64
+CGAME_DLL = eglcgame$(LIBARCH).dll
+GAME_DLL = game$(LIBARCH).dll
+DLL_LDFLAGS = -m64 -shared
+
+# Source files (adjust paths as needed)
+SHARED_SRC = $(wildcard shared/*.c)
+COMMON_SRC = $(filter-out common/zlib_stubs.c, $(wildcard common/*.c)) $(SHARED_SRC)
+CLIENT_SRC = $(wildcard client/*.c) $(wildcard win32/*.c) $(SDL2_SOURCES)
+CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
+GAME_SRC = $(wildcard game/*.c)
+RENDERER_SRC = $(wildcard renderer/*.c)
+SERVER_SRC = $(filter-out server/server_stubs.c, $(wildcard server/*.c))
+
+# Dedicated build uses only the Win32 system/console/net layer.
+DED_SYS_SRC = win32/win_main.c win32/win_console.c win32/win_sock.c
+
+# Object files
+COMMON_OBJ = $(COMMON_SRC:.c=.o)
+CLIENT_OBJ = $(CLIENT_SRC:.c=.o)
+CGAME_OBJ = $(CGAME_SRC:.c=.o)
+GAME_OBJ = $(GAME_SRC:.c=.o)
+RENDERER_OBJ = $(RENDERER_SRC:.c=.o)
+SERVER_OBJ = $(SERVER_SRC:.c=.o)
+
+SHARED_OBJ = $(SHARED_SRC:.c=.o)
+
+DED_COMMON_OBJ = $(addprefix $(DED_OBJDIR)/,$(COMMON_SRC:.c=.o))
+DED_SERVER_OBJ = $(addprefix $(DED_OBJDIR)/,$(SERVER_SRC:.c=.o))
+DED_SYS_OBJ = $(addprefix $(DED_OBJDIR)/,$(DED_SYS_SRC:.c=.o))
+
+# Targets
+# Default to client + modules. Dedicated server can be built explicitly.
+all: egl.exe modules
+
+debug:
+	$(MAKE) clean
+	$(MAKE) all CFLAGS="$(DBG_CFLAGS)" LDFLAGS="$(DBG_LDFLAGS)"
+
+egl.exe: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+$(CGAME_DLL): $(CGAME_OBJ) $(SHARED_OBJ) cgame/exports.def
+	$(CC) -o $@ $(DLL_LDFLAGS) $(CGAME_OBJ) $(SHARED_OBJ) cgame/exports.def
+
+$(GAME_DLL): $(GAME_OBJ) $(SHARED_OBJ) game/exports.def
+	$(CC) -o $@ $(DLL_LDFLAGS) $(GAME_OBJ) $(SHARED_OBJ) game/exports.def
+
+modules: $(CGAME_DLL) $(GAME_DLL)
+	-powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path baseq2 | Out-Null"
+	-powershell -NoProfile -Command "Copy-Item -Force $(CGAME_DLL) baseq2\\$(CGAME_DLL)"
+	-powershell -NoProfile -Command "Copy-Item -Force $(GAME_DLL) baseq2\\$(GAME_DLL)"
+
+egl-dedicated.exe: $(COMMON_OBJ) $(SERVER_OBJ) $(GAME_OBJ)
+	@echo "Deprecated target: use 'eglded.exe'"
+	@$(MAKE) eglded.exe
+	@powershell -NoProfile -Command "Copy-Item -Force eglded.exe egl-dedicated.exe"
+
+eglded.exe: $(DED_COMMON_OBJ) $(DED_SERVER_OBJ) $(DED_SYS_OBJ)
+	$(CC) -o $@ $^ $(DED_LDFLAGS)
+
+dedicated: egl-dedicated.exe
+
+$(DED_OBJDIR)/%.o: %.c
+	-powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(subst /,\\,$(dir $@))' | Out-Null"
+	$(CC) $(DED_CFLAGS) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	-powershell -NoProfile -Command "Get-Process egl -ErrorAction SilentlyContinue | Stop-Process -Force"
+	-powershell -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue *.exe"
+	-powershell -NoProfile -Command "Get-ChildItem -Recurse -Include *.o -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue"
+	-powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue build\\dedicated"
+
+.PHONY: all clean dedicated debug
