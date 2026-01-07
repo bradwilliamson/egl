@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 //
 
 #include "sv_local.h"
+#include <stddef.h>
 
 // FIXME: this use of "area" is different from the bsp file use
 
