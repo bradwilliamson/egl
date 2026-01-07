@@ -34,8 +34,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # include <GL/glx.h>
 #endif
 
-typedef int GLsizeiptrARB;
-typedef int GLintptrARB;
+#include <stddef.h>
+#ifndef GLsizeiptrARB
+typedef ptrdiff_t GLsizeiptrARB;
+#endif
+#ifndef GLintptrARB
+typedef ptrdiff_t GLintptrARB;
+#endif
 
 #ifndef APIENTRY
 # define APIENTRY
