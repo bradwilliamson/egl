@@ -52,6 +52,7 @@ CDAudio_GetAudioDiskInfo
 */
 static int CDAudio_GetAudioDiskInfo (void)
 {
+	return 0;
 }
 
 
@@ -142,6 +143,7 @@ CDAudio_Init
 */
 qBool CDAudio_Init (void)
 {
+	return qTrue;
 }
 
 
