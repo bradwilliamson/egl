@@ -88,22 +88,26 @@ void NET_NetadrToSockadr (netAdr_t *a, struct sockaddr_in *s)
 	}
 }
 
-char	*NET_AdrToString (netAdr_t a)
+char *NET_AdrToString (netAdr_t *a)
 {
-	static	char	str[64];
-	
-	switch (a.naType) {
-	case NA_LOOPBACK:
-		Q_snprintfz (str, sizeof (str), "loopback");
-		break;
+    static char str[64];
 
-	case NA_IP:
-		Q_snprintfz (str, sizeof (str), "%i.%i.%i.%i:%i",
-			a.ip[0], a.ip[1], a.ip[2], a.ip[3], ntohs(a.port));
-		break;
-	}
+    switch (a->naType) {
+    case NA_LOOPBACK:
+        Q_snprintfz (str, sizeof(str), "loopback");
+        break;
 
-	return str;
+    case NA_IP:
+        Q_snprintfz (str, sizeof(str), "%i.%i.%i.%i:%i",
+            a->ip[0], a->ip[1], a->ip[2], a->ip[3], ntohs(a->port));
+        break;
+
+    default:
+        Q_snprintfz (str, sizeof(str), "unknown");
+        break;
+    }
+
+    return str;
 }
 
 char	*NET_BaseAdrToString (netAdr_t a)
@@ -248,104 +252,104 @@ qBool	NET_GetLoopPacket (int sock, netAdr_t *net_from, netMsg_t *net_message)
 }
 
 
-void NET_SendLoopPacket (int sock, int length, void *data, netAdr_t to)
+void NET_SendLoopPacket (netSrc_t sock, size_t length, void *data, netAdr_t *to)
 {
-	int		i;
-	loopBack_t	*loop;
+    int        i;
+    loopBack_t    *loop;
 
-	loop = &loopbacks[sock^1];
+    loop = &loopbacks[sock^1];
 
-	i = loop->send & (MAX_LOOPBACK-1);
-	loop->send++;
+    i = loop->send & (MAX_LOOPBACK-1);
+    loop->send++;
 
-	memcpy (loop->msgs[i].data, data, length);
-	loop->msgs[i].datalen = length;
+    memcpy (loop->msgs[i].data, data, length);
+    loop->msgs[i].datalen = (int)length;
 }
 
 //=============================================================================
 
-qBool NET_GetPacket (int sock, netAdr_t *net_from, netMsg_t *net_message)
+qBool NET_GetPacket (netSrc_t sock, netAdr_t *net_from, netMsg_t *net_message)
 {
-	int 	ret;
-	struct sockaddr_in	from;
-	socklen_t		fromlen;
-	int		net_socket;
-	int		err;
+    int     ret;
+    struct sockaddr_in    from;
+    socklen_t        fromlen;
+    int        net_socket;
+    int        err;
 
-	if (NET_GetLoopPacket (sock, net_from, net_message))
-		return qTrue;
+    if (NET_GetLoopPacket (sock, net_from, net_message))
+        return qTrue;
 
-	net_socket = ipSockets[sock];
-	if (!net_socket)
-		return qFalse;
+    net_socket = ipSockets[sock];
+    if (!net_socket)
+        return qFalse;
 
-	fromlen = sizeof(from);
-	ret = recvfrom (net_socket, net_message->data, net_message->maxSize, 0, (struct sockaddr *)&from, &fromlen);
+    fromlen = sizeof(from);
+    ret = recvfrom (net_socket, net_message->data, net_message->maxSize, 0, (struct sockaddr *)&from, &fromlen);
 
-	NET_SockAdrToNetAdr (&from, net_from);
+    NET_SockAdrToNetAdr (&from, net_from);
 
-	if (ret == -1) {
-		err = errno;
+    if (ret == -1) {
+        err = errno;
 
-		if (err == EWOULDBLOCK || err == ECONNREFUSED)
-			return qFalse;
-		Com_Printf (0, "NET_GetPacket: %s from %s\n", NET_ErrorString(),
-					NET_AdrToString(*net_from));
-		return 0;
-	}
+        if (err == EWOULDBLOCK || err == ECONNREFUSED)
+            return qFalse;
+        Com_Printf (0, "NET_GetPacket: %s from %s\n", NET_ErrorString(),
+                    NET_AdrToString(net_from));
+        return qFalse;
+    }
 
-	if (ret == net_message->maxSize) {
-		Com_Printf (0, "Oversize packet from %s\n", NET_AdrToString (*net_from));
-		return qFalse;
-	}
+    if (ret == net_message->maxSize) {
+        Com_Printf (0, "Oversize packet from %s\n", NET_AdrToString (net_from));
+        return qFalse;
+    }
 
-	netStats.sizeIn += ret;
-	netStats.packetsIn++;
+    netStats.sizeIn += ret;
+    netStats.packetsIn++;
 
-	net_message->curSize = ret;
-	return qTrue;
+    net_message->curSize = ret;
+    return qTrue;
 }
 
 //=============================================================================
 
-int NET_SendPacket (int sock, int length, void *data, netAdr_t to)
+int NET_SendPacket (netSrc_t sock, size_t length, void *data, netAdr_t *to)
 {
-	int		ret;
-	struct sockaddr_in	addr;
-	int		net_socket;
+    int        ret;
+    struct sockaddr_in    addr;
+    int        net_socket;
 
-	switch (to.naType) {
-	case NA_LOOPBACK:
-		NET_SendLoopPacket (sock, length, data, to);
-		return 0;
+    switch (to->naType) {
+    case NA_LOOPBACK:
+        NET_SendLoopPacket (sock, length, data, to);
+        return 0;
 
-	case NA_BROADCAST:
-		net_socket = ipSockets[sock];
-		if (!net_socket)
-			return 0;
-		break;
+    case NA_BROADCAST:
+        net_socket = ipSockets[sock];
+        if (!net_socket)
+            return 0;
+        break;
 
-	case NA_IP:
-		net_socket = ipSockets[sock];
-		if (!net_socket)
-			return 0;
-		break;
+    case NA_IP:
+        net_socket = ipSockets[sock];
+        if (!net_socket)
+            return 0;
+        break;
 
-	default:
-		Com_Error (ERR_FATAL, "NET_SendPacket: bad address type: %d", to.naType);
-		break;
-	}
+    default:
+        Com_Error (ERR_FATAL, "NET_SendPacket: bad address type: %d", to->naType);
+        break;
+    }
 
-	NET_NetadrToSockadr (&to, &addr);
+    NET_NetadrToSockadr (to, &addr);
 
-	ret = sendto (net_socket, data, length, 0, (struct sockaddr *)&addr, sizeof(addr));
-	if (ret == -1) {
-		Com_Printf (0, "NET_SendPacket ERROR: %s to %s\n", NET_ErrorString(), NET_AdrToString (to));
-		return 0;
-		// FIXME: return -1 for certain errors like in net_wins.c
-	}
+    ret = sendto (net_socket, data, length, 0, (struct sockaddr *)&addr, sizeof(addr));
+    if (ret == -1) {
+        Com_Printf (0, "NET_SendPacket ERROR: %s to %s\n", NET_ErrorString(), NET_AdrToString (to));
+        return 0;
+        // FIXME: return -1 for certain errors like in net_wins.c
+    }
 
-	return 1;
+    return 1;
 }
 
 
@@ -358,82 +362,82 @@ NET_Config
 A single player game will only use the loopback code
 ====================
 */
-int NET_Config (int openFlags)
+netConfig_t NET_Config (netConfig_t openFlags)
 {
-	int		i;
+    int        i;
 
-	static int	oldFlags;
-	int			oldest;
-	cVar_t		*ip;
-	int			port;
+    static netConfig_t    oldFlags;
+    netConfig_t            oldest;
+    cVar_t        *ip;
+    int            port;
 
-	if (oldFlags == openFlags)
-		return oldFlags;
+    if (oldFlags == openFlags)
+        return oldFlags;
 
-	memset (&netStats, 0, sizeof (netStats));
+    memset (&netStats, 0, sizeof (netStats));
 
-	if (openFlags == NET_NONE) {
-		oldest = oldFlags;
-		oldFlags = NET_NONE;
+    if (openFlags == NET_NONE) {
+        oldest = oldFlags;
+        oldFlags = NET_NONE;
 
-		// shut down any existing sockets
-		if (ipSockets[NS_CLIENT]) {
-			close (ipSockets[NS_CLIENT]);
-			ipSockets[NS_CLIENT] = 0;
-		}
+        // shut down any existing sockets
+        if (ipSockets[NS_CLIENT]) {
+            close (ipSockets[NS_CLIENT]);
+            ipSockets[NS_CLIENT] = 0;
+        }
 
-		if (ipSockets[NS_SERVER]) {
-			close (ipSockets[NS_SERVER]);
-			ipSockets[NS_SERVER] = 0;
-		}
-	}
-	else {
-		oldest = oldFlags;
-		oldFlags |= openFlags;
+        if (ipSockets[NS_SERVER]) {
+            close (ipSockets[NS_SERVER]);
+            ipSockets[NS_SERVER] = 0;
+        }
+    }
+    else {
+        oldest = oldFlags;
+        oldFlags = oldFlags | openFlags;
 
-		ip = Cvar_Register ("ip", "localhost", CVAR_READONLY);
+        ip = Cvar_Register ("ip", "localhost", CVAR_READONLY);
 
-		// open sockets
-		netStats.initTime = time (0);
-		netStats.initialized = qTrue;
+        // open sockets
+        netStats.initTime = time (0);
+        netStats.initialized = qTrue;
 
-		if (openFlags & NET_SERVER) {
-			if (!ipSockets[NS_SERVER]) {
-				port = Cvar_Register ("ip_hostport", "0", CVAR_READONLY)->intVal;
-				if (!port) {
-					port = Cvar_Register ("hostport", "0", CVAR_READONLY)->intVal;
-					if (!port)
-						port = Cvar_Register ("port", Q_VarArgs ("%i", PORT_SERVER), CVAR_READONLY)->intVal;
-				}
+        if (openFlags & NET_SERVER) {
+            if (!ipSockets[NS_SERVER]) {
+                port = Cvar_Register ("ip_hostport", "0", CVAR_READONLY)->intVal;
+                if (!port) {
+                    port = Cvar_Register ("hostport", "0", CVAR_READONLY)->intVal;
+                    if (!port)
+                        port = Cvar_Register ("port", Q_VarArgs ("%i", PORT_SERVER), CVAR_READONLY)->intVal;
+                }
 
-				ipSockets[NS_SERVER] = NET_Socket (ip->string, port);
-				if (!ipSockets[NS_SERVER] && dedicated->intVal)
-					Com_Error (ERR_FATAL, "Couldn't allocate dedicated server IP port");
-			}
-		}
+                ipSockets[NS_SERVER] = NET_Socket (ip->string, port);
+                if (!ipSockets[NS_SERVER] && dedicated->intVal)
+                    Com_Error (ERR_FATAL, "Couldn't allocate dedicated server IP port");
+            }
+        }
 
-		// dedicated servers don't need client ports
-		if (!dedicated->intVal && openFlags & NET_CLIENT) {
-			if (!ipSockets[NS_CLIENT]) {
- 				int		newport = frand() * 64000 + 1024;
+        // dedicated servers don't need client ports
+        if (!dedicated->intVal && openFlags & NET_CLIENT) {
+            if (!ipSockets[NS_CLIENT]) {
+                int        newport = frand() * 64000 + 1024;
 
-				port = Cvar_Register ("ip_clientport", Q_VarArgs ("%i", newport), CVAR_READONLY)->intVal;
-				if (!port) {
-					port = Cvar_Register ("clientport", Q_VarArgs ("%i", newport), CVAR_READONLY)->intVal;
-					if (!port) {
-						port = PORT_ANY;
- 						Cvar_Set ("clientport", Q_VarArgs ("%d", newport), qFalse);
-					}
-				}
+                port = Cvar_Register ("ip_clientport", Q_VarArgs ("%i", newport), CVAR_READONLY)->intVal;
+                if (!port) {
+                    port = Cvar_Register ("clientport", Q_VarArgs ("%i", newport), CVAR_READONLY)->intVal;
+                    if (!port) {
+                        port = PORT_ANY;
+                        Cvar_Set ("clientport", Q_VarArgs ("%d", newport), qFalse);
+                    }
+                }
 
-				ipSockets[NS_CLIENT] = NET_Socket (ip->string, port);
-				if (!ipSockets[NS_CLIENT])
-					ipSockets[NS_CLIENT] = NET_Socket (ip->string, PORT_ANY);
-			}
-		}
-	}
+                ipSockets[NS_CLIENT] = NET_Socket (ip->string, port);
+                if (!ipSockets[NS_CLIENT])
+                    ipSockets[NS_CLIENT] = NET_Socket (ip->string, PORT_ANY);
+            }
+        }
+    }
 
-	return oldest;	
+    return oldest;
 }
 
 
@@ -583,7 +587,7 @@ NET_Init
 */
 void NET_Init (void)
 {
-  cmd_netStats = Cmd_AddCommand (qFalse, "net_stats", NET_Stats_f, "Prints out connection information");
+  cmd_netStats = Cmd_AddCommand ("net_stats", NET_Stats_f, "Prints out connection information");
 }
 
 
