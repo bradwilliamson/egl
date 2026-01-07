@@ -35,6 +35,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "../client/cl_local.h"
 #include "unix_glimp.h"
 #include "unix_local.h"
+#include "x11_linux.h"
 
 static qBool    vid_queueRestart;
 static qBool    vid_isActive;
@@ -343,8 +344,8 @@ void VID_Init (refConfig_t *outConfig)
 	gl_swap_interval = Cvar_Register ("gl_swap_interval", "1", CVAR_ARCHIVE);
 
 	// Add some console commands that we want to handle
-	Cmd_AddCommand (qFalse, "vid_restart", VID_Restart_f, "Restarts refresh and media");
-	Cmd_AddCommand (qFalse, "listremaps", ListRemaps_f, "Lists what keys are remapped to AUX* bindings");
+	Cmd_AddCommand ("vid_restart", VID_Restart_f, "Restarts refresh and media");
+	Cmd_AddCommand ("listremaps", ListRemaps_f, "Lists what keys are remapped to AUX* bindings");
 
 	// Start the graphics mode and load refresh DLL
 	vid_isActive = qFalse;

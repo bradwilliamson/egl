@@ -802,7 +802,7 @@ void IN_Init (void)
 	// Mouse variables
 	in_dgamouse	= Cvar_Register ("in_dgamouse", "1", CVAR_ARCHIVE);
 
-	Cmd_AddCommand (qFalse, "force_centerview", Force_CenterView_f, "Force the screen to a center view");
+	Cmd_AddCommand ("force_centerview", Force_CenterView_f, "Force the screen to a center view");
 }
 
 

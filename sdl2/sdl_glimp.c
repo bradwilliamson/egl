@@ -236,8 +236,8 @@ void VID_Init (refConfig_t *outConfig)
     vid_ypos = Cvar_Register ("vid_ypos", "22", CVAR_ARCHIVE);
     vid_fullscreen = Cvar_Register ("vid_fullscreen", "0", CVAR_ARCHIVE);
 
-    Cmd_AddCommand (qFalse, "vid_restart", VID_Restart_f, "Restarts refresh and media");
-    Cmd_AddCommand (qFalse, "vid_front", VID_Front_f, "Brings window to front");
+    Cmd_AddCommand ("vid_restart", VID_Restart_f, "Restarts refresh and media");
+    Cmd_AddCommand ("vid_front", VID_Front_f, "Brings window to front");
 
     vid_queueRestart = qTrue;
     vid_isActive = qFalse;
