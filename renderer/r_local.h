@@ -57,8 +57,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 =============================================================================
 */
 
-#endif // __R_LOCAL_H__
-
 // GL_ARB_vertex_program
 #define GL_COLOR_SUM_ARB                  0x8458
 #define GL_VERTEX_PROGRAM_ARB             0x8620
@@ -1132,3 +1130,5 @@ void	GLimp_SetGammaRamp (uint16 *ramp);
 void	GLimp_Shutdown (qBool full);
 qBool	GLimp_Init (void);
 qBool	GLimp_AttemptMode (qBool fullScreen, int width, int height);
+
+#endif // __R_LOCAL_H__
