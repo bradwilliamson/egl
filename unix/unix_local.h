@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // unix_local.h
 //
 
+#ifndef __UNIX_LOCAL_H__
+#define __UNIX_LOCAL_H__
+
 extern cVar_t	*s_bits;
 extern cVar_t	*s_speed;
 extern cVar_t	*s_channels;
@@ -50,3 +53,4 @@ void		Snd_SDL_Shutdown (void);
 int			Snd_SDL_GetDMAPos (void);
 void		Snd_SDL_BeginPainting (void);
 void		Snd_SDL_Submit (void);
+#endif // __UNIX_LOCAL_H__
