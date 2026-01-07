@@ -7,8 +7,9 @@ Build: make -f Makefile.unix USE_SDL2=1
 TODO: flesh out full mode enumeration/setting, input hookup, and gamma control.
 */
 
-#include "../unix/unix_glimp.h"
+#include "../renderer/r_local.h"
 #include "../client/cl_local.h"
+#include "../unix/unix_glimp.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 #include <limits.h>

@@ -413,6 +413,8 @@ static void R_LoadPCX (char *name, byte **pic, byte **palette, int *width, int *
 ==============================================================================
 */
 
+#ifndef _WIN32
+
 typedef struct pngBuf_s {
 	byte	*buffer;
 	size_t	pos;
@@ -431,6 +433,8 @@ static void PngReadFunc (png_structp png, png_bytep outBytes, png_size_t byteCou
 	memcpy (outBytes, src->buffer + src->pos, byteCountToRead);
 	src->pos += byteCountToRead;
 }
+
+#endif // _WIN32
 
 /*
 =============
