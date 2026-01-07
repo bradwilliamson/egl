@@ -43,14 +43,18 @@ jobs:
       - name: Show build log (tail)
         if: always()
         run: |
-          echo "---- build.log tail (last 300 lines) ----"
+          echo "---- build.log errors (first 200 matches) ----"
           if [ -f build.log ]; then
+            grep -n -i "error\|fatal error" build.log | sed -n '1,200p' || true
+            echo "---- build.log warnings (first 200 matches) ----"
+            grep -n -i "warning" build.log | sed -n '1,200p' || true
+            echo "---- build.log tail (last 300 lines) ----"
             tail -n 300 build.log || true
           else
             echo "No build.log present; listing workspace:"
             ls -la || true
           fi
-          echo "---- end build.log tail ----"
+          echo "---- end build.log ----"
 
       - name: Compile SDL2 smoke test
         if: success()
