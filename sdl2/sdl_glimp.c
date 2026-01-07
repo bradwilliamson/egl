@@ -19,7 +19,7 @@ static SDL_GLContext sdl_glctx = NULL;
 /* Platform cvars */
 static cVar_t *vid_xpos = NULL;
 static cVar_t *vid_ypos = NULL;
-static cVar_t *vid_fullscreen = NULL;
+cVar_t *vid_fullscreen = NULL;
 static cVar_t *gl_swap_control = NULL;
 static cVar_t *gl_swap_interval = NULL;
 
@@ -90,6 +90,11 @@ void GLimp_Shutdown (qBool full)
         sdl_window = NULL;
     }
     SDL_Quit ();
+}
+
+void GLimp_BeginFrame (void)
+{
+    /* Nothing needed for SDL2 at frame start */
 }
 
 /* Attempts to set the requested mode using SDL display modes */

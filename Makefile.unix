@@ -20,7 +20,7 @@ CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing 
 # -lX11 and -lGL are required for the client.
 # -lXrandr is added to support modern mode switching and gamma on X11.
 # -ldl is required for dlopen() (modules + OpenAL loader).
-LDFLAGS_COMMON = -ldl -lm -lz -lminizip
+LDFLAGS_COMMON = -ldl -lm -lz -lminizip -ljpeg -lpng
 LDFLAGS_CLIENT = -lX11 -lGL -lXrandr $(LDFLAGS_COMMON)
 
 # Dedicated build (no renderer/client)
