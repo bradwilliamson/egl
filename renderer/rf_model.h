@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_model.h
 // Memory representation of the different model types
 //
+#ifndef __RF_MODEL_H__
+#define __RF_MODEL_H__
 
 /*
 ==============================================================================
