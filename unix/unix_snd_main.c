@@ -142,7 +142,7 @@ void SndImp_Shutdown (void)
 	}
 
 	// Should never reach here
-	return qFalse;
+	return;
 }
 
 

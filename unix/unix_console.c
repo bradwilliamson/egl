@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "unix_local.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/time.h>
+#include <sys/select.h>
 
 qBool	stdin_active = qTrue;
 
