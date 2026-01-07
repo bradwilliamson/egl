@@ -26,6 +26,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "unix_glimp.h"
 #include "unix_local.h"
 
+/* XI2 for raw input */
+#ifdef XI_RawMotion
+# include <X11/extensions/XInput2.h>
+#endif
+
 // Console variables that we need to access from this module
 cVar_t		*vid_xpos;			// X coordinate of window position
 cVar_t		*vid_ypos;			// Y coordinate of window position
@@ -48,8 +53,13 @@ static qBool dgamouse = qFalse;
 static int   grab_screenmode = -1;
 
 static cVar_t *in_dgamouse;
+static cVar_t *in_xinput2; /* Toggle XInput2 raw events */
 
 cVar_t *in_mouse;
+
+/* XInput2 state */
+static int xi_opcode = -1;
+static qBool xi2_active = qFalse;
 
 /*
 ==========================================================================
@@ -326,6 +336,11 @@ static void X11_HandleEvents (void)
 			break;
 
 		case MotionNotify:
+			/* If XInput2 raw events are active and enabled, ignore legacy MotionNotify to avoid double movement. */
+			if (xi2_active && in_xinput2 && in_xinput2->intVal) {
+				break;
+			}
+
 			if (!mouse_grabbed) {
 				xMove = event.xmotion.x-p_mouse_x;
 				yMove = event.xmotion.y-p_mouse_y;
@@ -409,7 +424,57 @@ static void X11_HandleEvents (void)
 			if (event.xclient.data.l[0] == x11display.wmDeleteWindow) 
 				Cmd_ExecuteString ("quit");
 			break;
-		}
+		/* XInput2 raw events delivered as GenericEvent */
+		case GenericEvent: {
+#ifdef XI_RawMotion
+			if (event.xcookie.type == GenericEvent && event.xcookie.extension == xi_opcode) {
+				if (XGetEventData (x11display.dpy, &event.xcookie)) {
+					XIRawEvent *rawev = (XIRawEvent *) event.xcookie.data;
+					if (rawev->evtype == XI_RawMotion) {
+						/* raw_values contains axis deltas in order - typically X then Y */
+						double *vals = rawev->raw_values;
+						int dx = 0, dy = 0;
+						if (vals) {
+							dx = (int) vals[0];
+							dy = (int) vals[1];
+						}
+						if (dx || dy)
+							CL_MoveMouse (dx, dy);
+					}
+					else if (rawev->evtype == XI_RawButtonPress) {
+						int b = rawev->detail;
+						switch (b) {
+						case 1: Key_Event (K_MOUSE1, qTrue, Sys_Milliseconds ()); break;
+						case 2: Key_Event (K_MOUSE3, qTrue, Sys_Milliseconds ()); break;
+						case 3: Key_Event (K_MOUSE2, qTrue, Sys_Milliseconds ()); break;
+						case 4: Key_Event (K_MWHEELUP, qTrue, Sys_Milliseconds ()); break;
+						case 5: Key_Event (K_MWHEELDOWN, qTrue, Sys_Milliseconds ()); break;
+						default:
+							if (b >= 6 && b <= 10)
+								Key_Event (K_MOUSE4 + (b - 6), qTrue, Sys_Milliseconds ());
+							break;
+						}
+					}
+					else if (rawev->evtype == XI_RawButtonRelease) {
+						int b = rawev->detail;
+						switch (b) {
+						case 1: Key_Event (K_MOUSE1, qFalse, Sys_Milliseconds ()); break;
+						case 2: Key_Event (K_MOUSE3, qFalse, Sys_Milliseconds ()); break;
+						case 3: Key_Event (K_MOUSE2, qFalse, Sys_Milliseconds ()); break;
+						case 4: Key_Event (K_MWHEELUP, qFalse, Sys_Milliseconds ()); break;
+						case 5: Key_Event (K_MWHEELDOWN, qFalse, Sys_Milliseconds ()); break;
+						default:
+							if (b >= 6 && b <= 10)
+								Key_Event (K_MOUSE4 + (b - 6), qFalse, Sys_Milliseconds ());
+							break;
+						}
+					}
+					XFreeEventData (x11display.dpy, &event.xcookie);
+				}
+			}
+#endif
+			break;
+		}		}
 	}
 
 	// Move the mouse to the window center again
@@ -479,7 +544,40 @@ qBool X11_CreateGLContext (void)
 	Com_Printf (0, "Display initialization\n");
 
 	X11_DisplayNeeded ();
+	/* Register input-related cvars (once display exists) */
+	in_dgamouse = Cvar_Register ("in_dgamouse", "0", CVAR_ARCHIVE);
+	in_xinput2 = Cvar_Register ("in_xinput2", "1", CVAR_ARCHIVE);
 
+	/* Try initializing XInput2 if requested */
+#ifdef XI_RawMotion
+	if (in_xinput2 && in_xinput2->intVal) {
+		int major = 2, minor = 0;
+		if (XIQueryVersion (x11display.dpy, &major, &minor) == Success) {
+			Com_Printf (0, "..XInput2 available (version %d.%d)\n", major, minor);
+			/* find extension opcode for later event filtering */
+			int xi_opcode_local, xi_event, xi_error;
+			if (XQueryExtension (x11display.dpy, "XInputExtension", &xi_opcode_local, &xi_event, &xi_error))
+				xi_opcode = xi_opcode_local;
+
+			/* Select raw motion and raw button events */
+			unsigned char mask[XIMaskLen (XI_RawMotion)];
+			memset (mask, 0, sizeof (mask));
+			XISetMask (mask, XI_RawMotion);
+			XISetMask (mask, XI_RawButtonPress);
+			XISetMask (mask, XI_RawButtonRelease);
+
+			XIEventMask evmask;
+			evmask.deviceid = XIAllMasterDevices;
+			evmask.mask = mask;
+			evmask.mask_len = sizeof (mask);
+			XISelectEvents (x11display.dpy, x11display.root, &evmask, 1);
+			XFlush (x11display.dpy);
+			xi2_active = qTrue;
+		} else {
+			Com_Printf (0, "..XInput2 not supported\n");
+		}
+	}
+#endif
 	if (x11display.visinfo) {
 		XFree (x11display.visinfo);
 		x11display.visinfo = NULL;
@@ -626,6 +724,20 @@ void X11_Shutdown (void)
 			XDestroyWindow (x11display.dpy, x11display.fs_win);
 			x11display.fs_win = 0;
 		}
+
+		/* Disable XInput2 event selection if active */
+#ifdef XI_RawMotion
+		if (xi2_active) {
+			unsigned char mask[XIMaskLen (XI_RawMotion)];
+			memset (mask, 0, sizeof (mask));
+			XIEventMask evmask;
+			evmask.deviceid = XIAllMasterDevices;
+			evmask.mask = mask;
+			evmask.mask_len = sizeof (mask);
+			XISelectEvents (x11display.dpy, x11display.root, &evmask, 1);
+			xi2_active = qFalse;
+		}
+#endif
 
 		XFlush (x11display.dpy);
 		XCloseDisplay (x11display.dpy);

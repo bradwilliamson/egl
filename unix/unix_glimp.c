@@ -41,6 +41,126 @@ static qBool    vid_isActive;
 
 glxState_t glxState = {.OpenGLLib = NULL};
 
+/* Swap control function pointers */
+static void (*glXSwapIntervalEXT_ptr) (Display*, GLXDrawable, int) = NULL;
+static int  (*glXSwapIntervalSGI_ptr) (int) = NULL;
+static int  (*glXSwapIntervalMESA_ptr) (int) = NULL;
+static int  gl_swap_method = 0; /* 0: none, 1: EXT, 2: SGI, 3: MESA */
+
+/* Cvars */
+static cVar_t *gl_swap_control = NULL;
+static cVar_t *gl_swap_interval = NULL;
+
+/* Set swap interval using the detected method */
+static void GLimp_SetSwapInterval (int interval)
+{
+	if (!gl_swap_method || !gl_swap_control || !gl_swap_interval)
+		return;
+
+	if (!gl_swap_control->intVal)
+		interval = 0;
+
+	switch (gl_swap_method) {
+	case 1: /* EXT */
+		if (glXSwapIntervalEXT_ptr) {
+			glXSwapIntervalEXT_ptr (x11display.dpy, x11display.gl_win, interval);
+			Com_Printf (0, "gl_swap_control: set EXT interval %d\n", interval);
+		}
+		break;
+	case 2: /* SGI */
+		if (glXSwapIntervalSGI_ptr) {
+			glXSwapIntervalSGI_ptr (interval);
+			Com_Printf (0, "gl_swap_control: set SGI interval %d\n", interval);
+		}
+		break;
+	case 3: /* MESA */
+		if (glXSwapIntervalMESA_ptr) {
+			glXSwapIntervalMESA_ptr (interval);
+			Com_Printf (0, "gl_swap_control: set MESA interval %d\n", interval);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+/* Detect available swap control extensions and functions */
+static void GLimp_InitSwapControl (void)
+{
+	void *sym = NULL;
+
+	/* Prefer EXT, fall back to SGI / MESA */
+	if (!glxState.OpenGLLib) {
+		Com_Printf (PRNT_WARNING, "GLimp_InitSwapControl: OpenGL library not loaded yet\n");
+		return;
+	}
+
+	/* Try glXSwapIntervalEXT */
+	sym = dlsym (glxState.OpenGLLib, "glXSwapIntervalEXT");
+	if (sym) {
+		glXSwapIntervalEXT_ptr = (void (*)(Display*, GLXDrawable, int)) sym;
+		gl_swap_method = 1;
+		Com_Printf (0, "GLimp: Found glXSwapIntervalEXT\n");
+		GLimp_SetSwapInterval (gl_swap_interval->intVal);
+		return;
+	}
+
+	/* Try SGI */
+	sym = dlsym (glxState.OpenGLLib, "glXSwapIntervalSGI");
+	if (sym) {
+		glXSwapIntervalSGI_ptr = (int (*)(int)) sym;
+		gl_swap_method = 2;
+		Com_Printf (0, "GLimp: Found glXSwapIntervalSGI\n");
+		GLimp_SetSwapInterval (gl_swap_interval->intVal);
+		return;
+	}
+
+	/* Try MESA */
+	sym = dlsym (glxState.OpenGLLib, "glXSwapIntervalMESA");
+	if (sym) {
+		glXSwapIntervalMESA_ptr = (int (*)(int)) sym;
+		gl_swap_method = 3;
+		Com_Printf (0, "GLimp: Found glXSwapIntervalMESA\n");
+		GLimp_SetSwapInterval (gl_swap_interval->intVal);
+		return;
+	}
+
+	/* If none found, try indirect lookup via glXGetProcAddressARB (some drivers only export via that) */
+	sym = dlsym (glxState.OpenGLLib, "glXGetProcAddressARB");
+	if (sym) {
+		void *(*glXGetProcAddressARB) (const GLubyte *) = (void *(*)(const GLubyte *)) sym;
+		void *p = glXGetProcAddressARB ((const GLubyte *)"glXSwapIntervalEXT");
+		if (p) {
+			glXSwapIntervalEXT_ptr = (void (*)(Display*, GLXDrawable, int)) p;
+			gl_swap_method = 1;
+			Com_Printf (0, "GLimp: Found glXSwapIntervalEXT via glXGetProcAddressARB\n");
+			GLimp_SetSwapInterval (gl_swap_interval->intVal);
+			return;
+		}
+
+		p = glXGetProcAddressARB ((const GLubyte *)"glXSwapIntervalSGI");
+		if (p) {
+			glXSwapIntervalSGI_ptr = (int (*)(int)) p;
+			gl_swap_method = 2;
+			Com_Printf (0, "GLimp: Found glXSwapIntervalSGI via glXGetProcAddressARB\n");
+			GLimp_SetSwapInterval (gl_swap_interval->intVal);
+			return;
+		}
+
+		p = glXGetProcAddressARB ((const GLubyte *)"glXSwapIntervalMESA");
+		if (p) {
+			glXSwapIntervalMESA_ptr = (int (*)(int)) p;
+			gl_swap_method = 3;
+			Com_Printf (0, "GLimp: Found glXSwapIntervalMESA via glXGetProcAddressARB\n");
+			GLimp_SetSwapInterval (gl_swap_interval->intVal);
+			return;
+		}
+	}
+
+	Com_Printf (0, "GLimp: No GLX swap control found (vsync not supported)\n");
+	gl_swap_method = 0;
+}
+
 /*
 =============================================================================
 
@@ -71,6 +191,16 @@ Only error check if active, and don't swap if not active an you're in fullscreen
 */
 void GLimp_EndFrame (void)
 {
+	/* Apply swap interval changes immediately when the cvars are modified */
+	if (gl_swap_control && gl_swap_control->modified) {
+		gl_swap_control->modified = qFalse;
+		GLimp_SetSwapInterval (gl_swap_control->intVal ? gl_swap_interval->intVal : 0);
+	}
+	if (gl_swap_interval && gl_swap_interval->modified) {
+		gl_swap_interval->modified = qFalse;
+		GLimp_SetSwapInterval (gl_swap_control && gl_swap_control->intVal ? gl_swap_interval->intVal : 0);
+	}
+
 	X11_SwapBuffers ();
 }
 
@@ -174,8 +304,9 @@ void VID_CheckChanges (refConfig_t *outConfig)
 
 		R_GetRefConfig (outConfig);
 
-		Snd_Init ();
-		CL_MediaInit ();
+	/* Initialize swap-control / vsync support if available */
+	GLimp_InitSwapControl ();
+
 
 		cls.disableScreen = qFalse;
 
@@ -206,6 +337,10 @@ void VID_Init (refConfig_t *outConfig)
 	vid_xpos = Cvar_Register ("vid_xpos", "3", CVAR_ARCHIVE);
 	vid_ypos = Cvar_Register ("vid_ypos", "22", CVAR_ARCHIVE);
 	vid_fullscreen = Cvar_Register ("vid_fullscreen", "0", CVAR_ARCHIVE);
+
+	/* VSync / swap control */
+	gl_swap_control = Cvar_Register ("gl_swap_control", "1", CVAR_ARCHIVE);
+	gl_swap_interval = Cvar_Register ("gl_swap_interval", "1", CVAR_ARCHIVE);
 
 	// Add some console commands that we want to handle
 	Cmd_AddCommand (qFalse, "vid_restart", VID_Restart_f, "Restarts refresh and media");

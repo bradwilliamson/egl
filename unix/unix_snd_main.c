@@ -104,7 +104,7 @@ mark0:
 		break;
 
 	case SNDSYS_SDL:
-		// FIXME
+		success = Snd_SDL_Init ();
 		break;
 	}
 
@@ -137,7 +137,7 @@ void SndImp_Shutdown (void)
 		break;
 
 	case SNDSYS_SDL:
-		// FIXME
+		Snd_SDL_Shutdown ();
 		break;
 	}
 
@@ -162,8 +162,7 @@ int SndImp_GetDMAPos (void)
 		return OSS_GetDMAPos ();
 
 	case SNDSYS_SDL:
-		// FIXME
-		return qFalse;
+		return Snd_SDL_GetDMAPos ();
 	}
 
 	// Should never reach here
@@ -188,7 +187,7 @@ void SndImp_BeginPainting (void)
 		break;
 
 	case SNDSYS_SDL:
-		// FIXME
+		Snd_SDL_BeginPainting ();
 		break;
 	}
 }
@@ -213,7 +212,7 @@ void SndImp_Submit (void)
 		break;
 
 	case SNDSYS_SDL:
-		// FIXME
+		Snd_SDL_Submit ();
 		break;
 	}
 }

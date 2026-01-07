@@ -43,3 +43,10 @@ void		OSS_Shutdown (void);
 int			OSS_GetDMAPos (void);
 void		OSS_BeginPainting (void);
 void		OSS_Submit (void);
+
+/* SDL sound backend */
+qBool		Snd_SDL_Init (void);
+void		Snd_SDL_Shutdown (void);
+int			Snd_SDL_GetDMAPos (void);
+void		Snd_SDL_BeginPainting (void);
+void		Snd_SDL_Submit (void);

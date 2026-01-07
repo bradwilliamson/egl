@@ -33,7 +33,199 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ==========================================================================
 */
 
-#ifdef XF86VMODE
+#if defined(HAVE_XRANDR)
+
+#include <X11/extensions/Xrandr.h>
+#include <limits.h>
+
+static int xr_supported = 0;
+static XRRScreenResources *xr_res = NULL;
+static XRRScreenConfiguration *xr_conf = NULL;
+static int xr_num_sizes = 0;
+static XRRScreenSize *xr_sizes = NULL;
+static int xr_original_size_index = -1;
+
+/*
+=============
+SCR_VidmodesInit (XRANDR)
+Tries to initialize XRandR support and stores screen sizes.
+=============
+*/
+void SCR_VidmodesInit (void)
+{
+	int major, minor;
+	if (XRRQueryVersion (x11display.dpy, &major, &minor)) {
+		Com_Printf (0, "..XRandR version %d.%d\n", major, minor);
+		xr_conf = XRRGetScreenInfo (x11display.dpy, x11display.root);
+		if (xr_conf) {
+			xr_sizes = XRRSizes (x11display.dpy, x11display.scr, &xr_num_sizes);
+			xr_res = XRRGetScreenResources (x11display.dpy, x11display.root);
+			xr_supported = 1;
+			/* store original size index */
+			xr_original_size_index = XRRConfigCurrentConfiguration (xr_conf, (Rotation *) &minor);
+		}
+	}
+	else {
+		Com_Printf (0, "..XRandR extension not available\n");
+		xr_supported = 0;
+	}
+}
+
+
+/*
+=============
+SCR_VidmodesFree (XRANDR)
+Free any XRandR resources we allocated.
+=============
+*/
+void SCR_VidmodesFree (void)
+{
+	if (xr_res) {
+		XRRFreeScreenResources (xr_res);
+		xr_res = NULL;
+	}
+	if (xr_conf) {
+		XRRFreeScreenConfigInfo (xr_conf);
+		xr_conf = NULL;
+	}
+	xr_supported = 0;
+}
+
+
+/*
+=============
+SCR_VidmodesSwitch (XRANDR)
+Set the screen size index using XRRSetScreenConfig.
+=============
+*/
+void SCR_VidmodesSwitch (int mode)
+{
+	if (!xr_supported || !xr_conf)
+		return;
+
+	if (mode < 0 || mode >= xr_num_sizes)
+		return;
+
+	Status s = XRRSetScreenConfig (x11display.dpy, xr_conf, x11display.root, mode, RR_Rotate_0, CurrentTime);
+	if (s != Success) {
+		Com_Printf (PRNT_WARNING, "Warning: XRRSetScreenConfig failed\n");
+	}
+}
+
+
+/*
+=============
+SCR_VidmodesSwitchBack (XRANDR)
+Restore the original configuration.
+=============
+*/
+void SCR_VidmodesSwitchBack (void)
+{
+	if (!xr_supported || !xr_conf || xr_original_size_index < 0)
+		return;
+
+	XRRSetScreenConfig (x11display.dpy, xr_conf, x11display.root, xr_original_size_index, RR_Rotate_0, CurrentTime);
+}
+
+
+/*
+=============
+SCR_VidmodesFindBest (XRANDR)
+Find the best matching size index and update width/height.
+=============
+*/
+void SCR_VidmodesFindBest (int *mode, int *pwidth, int *pheight)
+{
+	int best_fit = -1;
+	int best_dist = INT_MAX;
+
+	if (xr_supported && xr_sizes && xr_num_sizes > 0) {
+		for (int i = 0; i < xr_num_sizes; ++i) {
+			int w = xr_sizes[i].width;
+			int h = xr_sizes[i].height;
+			if (w < *pwidth || h < *pheight)
+				continue;
+			int dx = abs (w - *pwidth);
+			int dy = abs (h - *pheight);
+			int dist = (dx > dy) ? dx : dy;
+			if (dist < best_dist) {
+				best_dist = dist;
+				best_fit = i;
+			}
+		}
+
+		if (best_fit >= 0) {
+			*pwidth = xr_sizes[best_fit].width;
+			*pheight = xr_sizes[best_fit].height;
+		}
+	}
+
+	*mode = best_fit;
+}
+
+
+/*
+=============
+SCR_GetGammaRamp / SCR_SetGammaRamp (XRANDR)
+Try to use XRR CRTC gamma functions if available. We use the first CRTC found.
+Note: Not all drivers support these functions; fall back to failure.
+=============
+*/
+qBool SCR_GetGammaRamp (uint16 *ramp)
+{
+	if (!xr_supported || !xr_res || xr_res->ncrtc <= 0)
+		return qFalse;
+
+	RRCrtc crtc = xr_res->crtcs[0];
+	int size = XRRGetCrtcGammaSize (x11display.dpy, crtc);
+	if (size <= 0 || size != 256)
+		return qFalse;
+
+	XRRCrtcGamma *g = XRRGetCrtcGamma (x11display.dpy, crtc);
+	if (!g)
+		return qFalse;
+
+	for (int i = 0; i < size; ++i) {
+		ramp[i] = g->red[i];
+		ramp[i + size] = g->green[i];
+		ramp[i + (size<<1)] = g->blue[i];
+	}
+
+	XFree (g);
+	return qTrue;
+}
+
+qBool SCR_SetGammaRamp (uint16 *ramp)
+{
+	if (!xr_supported || !xr_res || xr_res->ncrtc <= 0)
+		return qFalse;
+
+	RRCrtc crtc = xr_res->crtcs[0];
+	int size = XRRGetCrtcGammaSize (x11display.dpy, crtc);
+	if (size <= 0 || size != 256)
+		return qFalse;
+
+	XRRCrtcGamma *g = XRRGetCrtcGamma (x11display.dpy, crtc);
+	if (!g)
+		return qFalse;
+
+	for (int i = 0; i < size; ++i) {
+		g->red[i] = ramp[i];
+		g->green[i] = ramp[i + size];
+		g->blue[i] = ramp[i + (size<<1)];
+	}
+
+	if (!XRRSetCrtcGamma (x11display.dpy, crtc, g)) {
+		XFree (g);
+		return qFalse;
+	}
+
+	XFree (g);
+	return qTrue;
+}
+
+
+#else // XF86VMODE
 
 static int xf86_vidmodes_suported = 0;
 static XF86VidModeModeInfo **xf86_vidmodes;
