@@ -21,6 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // rf_local.h
 //
 
+#ifndef __RF_LOCAL_H__
+#define __RF_LOCAL_H__
+
 #include "r_local.h"
 
 #define ENTLIST_OFFSET	2
