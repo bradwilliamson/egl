@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // Refresh only header file
 //
 
+#ifndef __R_LOCAL_H__
+#define __R_LOCAL_H__
+
 #ifdef DEDICATED_ONLY
 # error You should not be including this file in a dedicated server build
 #endif // DEDICATED_ONLY
@@ -53,6 +56,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 =============================================================================
 */
+
+#endif // __R_LOCAL_H__
 
 // GL_ARB_vertex_program
 #define GL_COLOR_SUM_ARB                  0x8458
@@ -850,6 +855,23 @@ extern cVar_t	*r_flares;
 extern cVar_t	*r_flareFade;
 extern cVar_t	*r_flareSize;
 extern cVar_t	*r_fontScale;
+extern cVar_t	*r_effectscale;
+extern cVar_t	*r_effectscale_blaster;
+extern cVar_t	*r_effectscale_bfg;
+extern cVar_t	*r_effectscale_explo;
+extern cVar_t	*r_effectscale_ion;
+extern cVar_t	*r_effectscale_phalanx;
+extern cVar_t	*r_effectscale_rail;
+extern cVar_t	*r_effectscale_smoke;
+extern cVar_t	*r_effectscale_spark;
+extern cVar_t	*r_glow;
+extern cVar_t	*r_glow_explo;
+extern cVar_t	*r_glow_rail;
+extern cVar_t	*r_glow_spark;
+extern cVar_t	*r_glow_bfg;
+extern cVar_t	*r_glow_ion;
+extern cVar_t	*r_glow_autoscale;
+extern cVar_t	*r_max_batch_particles;
 extern cVar_t	*r_fullbright;
 extern cVar_t	*r_hwGamma;
 extern cVar_t	*r_lerpmodels;
