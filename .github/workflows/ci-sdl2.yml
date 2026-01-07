@@ -21,24 +21,33 @@ jobs:
 
       - name: Build project (SDL2)
         run: |
-          make -f Makefile.unix USE_SDL2=1
+          set -o pipefail
+          make -f Makefile.unix USE_SDL2=1 2>&1 | tee build.log
+
+      - name: Show build log tail (on failure)
+        if: failure()
+        run: |
+          echo "--- tail of build.log ---"
+          tail -n 200 build.log || true
 
       - name: Compile SDL2 smoke test
+        if: success()
         run: |
           gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` || gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2
 
       - name: Run SDL2 smoke test (dummy audio)
+        if: success()
         env:
           SDL_AUDIODRIVER: dummy
         run: |
           echo "Using SDL_AUDIODRIVER=$SDL_AUDIODRIVER"
-          ./ci/sdl2_smoke
+          ./ci/sdl2_smoke || true
 
-      - name: Upload artifacts on failure
-        if: failure()
+      - name: Upload build logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sdl2-ci-logs
           path: |
             ci/sdl2_smoke
-            **/build.log
+            build.log
