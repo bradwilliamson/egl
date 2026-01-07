@@ -127,9 +127,9 @@ Sys_ConsoleOutput
 void Sys_ConsoleOutput (const char *string)
 {
   static qBool colorleft = qFalse;
-  qBool        convert = con_convertcolors && (con_convertcolors->intVal == 1 && ttyc || con_convertcolors->intVal > 1);
-  char buf[65];
-  char c = 0;
+  qBool        convert = con_convertcolors && ((con_convertcolors->intVal == 1 && ttyc) || (con_convertcolors->intVal > 1));
+  char buf[66];
+  int  c = 0;
   char e;
 
   buf[65] = 0;

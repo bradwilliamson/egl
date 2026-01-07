@@ -29,6 +29,10 @@ extern cVar_t	*s_speed;
 extern cVar_t	*s_channels;
 extern cVar_t	*s_system;
 
+// unix_console.c
+void		Sys_InitConsole (void);
+void		Sys_ConsoleOutput (const char *string);
+
 /*
 =======================================================================
 

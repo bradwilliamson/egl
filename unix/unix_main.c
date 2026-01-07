@@ -51,6 +51,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 uid_t	saved_euid;
 
 #ifndef DEDICATED_ONLY
+void GLimp_Shutdown (qBool full);
 void X11_Shutdown (void);
 #endif
 
@@ -485,7 +486,7 @@ char *Sys_FindFirst (char *path, unsigned musthave, unsigned canhave) {
 	while ((d = readdir (fdir)) != NULL) {
 		if (!*findpattern || glob_match (findpattern, d->d_name)) {
 			if (CompareAttributes (findbase, d->d_name, musthave, canhave)) {
-				sprintf (findpath, "%s/%s", findbase, d->d_name);
+				Q_snprintfz (findpath, sizeof(findpath), "%s/%s", findbase, d->d_name);
 				return findpath;
 			}
 		}
@@ -509,7 +510,7 @@ char *Sys_FindNext (unsigned musthave, unsigned canhave) {
 	while (d) {
 		if (!*findpattern || glob_match (findpattern, d->d_name)) {
 			if (CompareAttributes (findbase, d->d_name, musthave, canhave)) {
-				sprintf (findpath, "%s/%s", findbase, d->d_name);
+				Q_snprintfz (findpath, sizeof(findpath), "%s/%s", findbase, d->d_name);
 				return findpath;
 			}
 		}
@@ -713,7 +714,8 @@ void *Sys_LoadLibrary (libType_t libType, void *parms)
 		Com_Error (ERR_FATAL, "Sys_LoadLibrary (%s) without Sys_UnloadLibrary", sys_libList[libType].title);
 
 	// Check the current debug directory first for development purposes
-	getcwd (cwd, sizeof(cwd));
+	if (!getcwd (cwd, sizeof(cwd)))
+		cwd[0] = 0;
 	Q_snprintfz (name, sizeof(name), "%s/%s/%s", cwd, debugdir, libName);
 	*lib = dlopen (name,  RTLD_NOW);
 
@@ -812,7 +814,7 @@ static void signal_handler (int sig)
 		printf ("Received signal %d, exiting...\n", sig);
 
 #ifndef DEDICATED_ONLY
-	GLimp_Shutdown ();
+	GLimp_Shutdown (qTrue);
 	X11_Shutdown ();
 #endif
 
@@ -838,7 +840,7 @@ int main (int argc, char **argv)
 
 	// Go back to real user for config loads
 	saved_euid = geteuid ();
-	seteuid (getuid ());
+	(void)seteuid (getuid ());
 
 	Com_Init (argc, argv);
 
