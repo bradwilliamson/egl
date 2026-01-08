@@ -47,7 +47,15 @@ static const char	*s_sysStrings[] = {
 	NULL
 };
 
+/*
+	If we aren't building with SDL2 support, do not default to the SDL sound
+	backend (it won't be linked, and will fail at link time if referenced).
+*/
+#ifdef HAVE_SDL2
 #define S_DEFAULTSYS	SNDSYS_SDL
+#else
+#define S_DEFAULTSYS	SNDSYS_OSS
+#endif
 
 static sndSystem_t		s_curSystem;
 
@@ -104,7 +112,12 @@ mark0:
 		break;
 
 	case SNDSYS_SDL:
+		#ifdef HAVE_SDL2
 		success = Snd_SDL_Init ();
+		#else
+		Com_Printf (PRNT_WARNING, "SndImp_Init: SDL sound backend requested but this build has no SDL2 support, falling back\n");
+		success = qFalse;
+		#endif
 		break;
 	}
 
@@ -137,7 +150,9 @@ void SndImp_Shutdown (void)
 		break;
 
 	case SNDSYS_SDL:
+		#ifdef HAVE_SDL2
 		Snd_SDL_Shutdown ();
+		#endif
 		break;
 	}
 
@@ -162,7 +177,11 @@ int SndImp_GetDMAPos (void)
 		return OSS_GetDMAPos ();
 
 	case SNDSYS_SDL:
+		#ifdef HAVE_SDL2
 		return Snd_SDL_GetDMAPos ();
+		#else
+		return 0;
+		#endif
 	}
 
 	// Should never reach here
@@ -187,7 +206,9 @@ void SndImp_BeginPainting (void)
 		break;
 
 	case SNDSYS_SDL:
+		#ifdef HAVE_SDL2
 		Snd_SDL_BeginPainting ();
+		#endif
 		break;
 	}
 }
@@ -212,7 +233,9 @@ void SndImp_Submit (void)
 		break;
 
 	case SNDSYS_SDL:
+		#ifdef HAVE_SDL2
 		Snd_SDL_Submit ();
+		#endif
 		break;
 	}
 }

@@ -16,8 +16,8 @@ mkdir -p "$BASEQ2_OUT"
 
 # Build
 make -f "$MAKEFILE" -C "$ROOT_DIR" clean
-make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" all
-make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" dedicated
+make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" USE_SDL2=1 all
+make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" USE_SDL2=1 dedicated
 
 # Stage binaries
 cp -f "$ROOT_DIR/egl" "$OUT_DIR/egl"

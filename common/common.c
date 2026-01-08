@@ -31,8 +31,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 jmp_buf	abortframe;		// an ERR_DROP occured, exit the entire frame
 
-// Stub for MinGW compatibility
-int __intrinsic_setjmpex(jmp_buf env) { return setjmp(env); }
+/*
+ * NOTE: Older toolchains sometimes needed a shim here, but modern MinGW
+ * provides its own setjmp/_setjmpex implementation and declares internal
+ * intrinsics with different signatures. Defining __intrinsic_setjmpex here
+ * breaks builds with current headers.
+ */
 
 cVar_t	nullCvar;
 
