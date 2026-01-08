@@ -32,7 +32,7 @@ SHARED_SRC = $(wildcard shared/*.c)
 COMMON_SRC = $(filter-out common/zlib_stubs.c, $(wildcard common/*.c)) $(SHARED_SRC)
 ifdef USE_SDL2
 # SDL2 build: use SDL2 for video/input/sound, but still need core Win32 platform code
-WIN32_SYS_SRC = win32/win_main.c win32/win_console.c win32/win_sock.c
+WIN32_SYS_SRC = win32/win_main.c win32/win_console.c win32/win_sock.c win32/win_snd_cd.c
 CLIENT_SRC = $(wildcard client/*.c) $(WIN32_SYS_SRC) $(SDL2_SOURCES)
 else
 CLIENT_SRC = $(wildcard client/*.c) $(wildcard win32/*.c)

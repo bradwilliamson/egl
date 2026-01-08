@@ -234,3 +234,24 @@ void IN_Activate (qBool active)
     if (!active)
         SDL2_SetGrabState (qFalse);
 }
+
+/*
+=================
+In_GetKeyState
+
+Used by the key system for a small number of OS-level toggles.
+SDL2 provides this via modifier state.
+=================
+*/
+qBool In_GetKeyState (keyNum_t keyNum)
+{
+    switch (keyNum) {
+    case K_CAPSLOCK:
+        return (SDL_GetModState () & KMOD_CAPS) ? qTrue : qFalse;
+    default:
+        break;
+    }
+
+    Com_Printf (PRNT_ERROR, "In_GetKeyState: Invalid key");
+    return qFalse;
+}
