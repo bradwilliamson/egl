@@ -141,7 +141,7 @@ static VkCompositeAlphaFlagBitsKHR choose_composite_alpha(VkCompositeAlphaFlagsK
 int main(int argc, char **argv)
 {
 	SDL_Window *window;
-	qBool no_present;
+	int no_present;
 	int win_w;
 	int win_h;
 	unsigned int sdl_ext_count;
