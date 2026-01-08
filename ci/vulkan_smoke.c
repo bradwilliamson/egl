@@ -141,6 +141,7 @@ static VkCompositeAlphaFlagBitsKHR choose_composite_alpha(VkCompositeAlphaFlagsK
 int main(int argc, char **argv)
 {
 	SDL_Window *window;
+	qBool no_present;
 	int win_w;
 	int win_h;
 	unsigned int sdl_ext_count;
@@ -195,8 +196,21 @@ int main(int argc, char **argv)
 	VkFence fence_in_flight;
 	uint32_t image_index;
 
-	(void)argc;
-	(void)argv;
+	no_present = 0;
+	for (i = 1; i < (uint32_t)argc; i++) {
+		if (strcmp(argv[i], "--no-present") == 0) {
+			no_present = 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+			printf("Usage: %s [--no-present]\n", argv[0]);
+			printf("  --no-present  Render one frame but skip vkQueuePresentKHR\n");
+			return 0;
+		}
+		fprintf(stderr, "ERROR: unknown arg: %s\n", argv[i]);
+		fprintf(stderr, "Try: %s --help\n", argv[0]);
+		return 2;
+	}
 
 	if (SDL_Init(SDL_INIT_VIDEO) != 0)
 		die_sdl("SDL_Init(SDL_INIT_VIDEO) failed");
@@ -860,23 +874,30 @@ int main(int argc, char **argv)
 		if (vr != VK_SUCCESS)
 			die_vk("vkQueueSubmit failed", vr);
 
-		memset(&pres, 0, sizeof(pres));
-		pres.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		pres.waitSemaphoreCount = 1;
-		pres.pWaitSemaphores = &sem_render_finished;
-		pres.swapchainCount = 1;
-		pres.pSwapchains = &swapchain;
-		pres.pImageIndices = &image_index;
-		vr = vkQueuePresentKHR(queue, &pres);
-		if (vr != VK_SUCCESS)
-			die_vk("vkQueuePresentKHR failed", vr);
+		if (!no_present) {
+			memset(&pres, 0, sizeof(pres));
+			pres.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+			pres.waitSemaphoreCount = 1;
+			pres.pWaitSemaphores = &sem_render_finished;
+			pres.swapchainCount = 1;
+			pres.pSwapchains = &swapchain;
+			pres.pImageIndices = &image_index;
+			vr = vkQueuePresentKHR(queue, &pres);
+			if (vr != VK_SUCCESS)
+				die_vk("vkQueuePresentKHR failed", vr);
+		} else {
+			printf("Vulkan smoke: --no-present set; skipping vkQueuePresentKHR\n");
+		}
 
 		vr = vkWaitForFences(device, 1, &fence_in_flight, VK_TRUE, UINT64_MAX);
 		if (vr != VK_SUCCESS)
 			die_vk("vkWaitForFences failed", vr);
 	}
 
-	printf("Vulkan smoke OK: rendered and presented one triangle\n");
+	if (!no_present)
+		printf("Vulkan smoke OK: rendered and presented one triangle\n");
+	else
+		printf("Vulkan smoke OK: rendered one triangle (no present)\n");
 
 	/* Cleanup (best-effort; keep it simple). */
 	vkDeviceWaitIdle(device);
