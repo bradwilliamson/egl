@@ -55,7 +55,6 @@ eglded
 /client/ui_stubs.c
 /common/zlib_stubs.c
 /server/server_stubs.c
-/cgame/cg_cvars.c
 
 # Packaged portable builds
 /out/
