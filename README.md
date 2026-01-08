@@ -2,6 +2,12 @@
 Originally written by Echon.
 A backup of EGL 0.3.1, as it was, from QuakeSrc back in 2007.
 
+## Modernization status
+
+**January 2026:** this repo is being actively modernized.
+The short-term focus is keeping builds working on Linux + Windows (MSYS2/MinGW64), especially via the SDL2 backend.
+Expect the build system and platform backends to continue evolving.
+
 ## Running
 EGL is an engine; it expects Quake II base game data to be present.
 
@@ -22,6 +28,10 @@ Use the helper:
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1 -j`
 
+SDL2 backend build:
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1 -j USE_SDL2=1`
+
 ## Packaging a portable folder (client + dedicated + data)
 
 To stage an installer-like folder layout (portable build) under `out\egl\`:
@@ -35,6 +45,11 @@ This will:
 - Copy `data\egl.pkz` into `out\egl\baseq2\egl.pkz`
 
 You still need to provide your legally-obtained Quake II data (at minimum `pak0.pak`) in `out\egl\baseq2\`.
+
+## CI
+
+GitHub Actions runs an SDL2 build on Linux and Windows (MSYS2/MinGW64) in `.github/workflows/ci-sdl2.yml`.
+The workflow also compiles a small Vulkan smoke test (compile/link on Linux; compile-only on Windows).
 
 ## Building on Linux (Ubuntu / openSUSE)
 
