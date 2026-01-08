@@ -16,6 +16,14 @@ EGL is an engine; it expects Quake II base game data to be present.
 
 Without `pak0.pak`, you'll see missing media warnings (e.g. `sound/misc/menu1.wav`, `pics/conchars.*`).
 
+## Download (release binaries)
+
+On the GitHub Releases page, download the ZIP for your OS and extract it into your Quake II folder.
+Then copy your legally-obtained `pak0.pak` into the extracted `baseq2/` directory.
+
+The release packages include the engine binaries, the `baseq2` game modules, and `egl.pkz`.
+They do not include Quake II game data.
+
 ## Building on Windows (PowerShell + MSYS2)
 
 If you run `make` from PowerShell and see:
