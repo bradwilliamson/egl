@@ -2,9 +2,9 @@ name: CI - SDL2 Build & Smoke Test
 
 on:
   push:
-    branches: [ main, sdl2-integration ]
+    branches: [ master, main, sdl2-integration, modernization-v1 ]
   pull_request:
-    branches: [ main ]
+    branches: [ master, main ]
   workflow_dispatch: {}
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config libjpeg-dev libpng-dev libminizip-dev
+          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config libjpeg-dev libpng-dev libminizip-dev libvulkan-dev
 
       - name: Build project (SDL2)
         run: |
@@ -64,6 +64,13 @@ jobs:
           set -o pipefail
           gcc -o ci/sdl2_smoke ci/sdl2_smoke.c `pkg-config --cflags --libs sdl2` 2>&1 | tee ci/compile_smoke.log || (set -o pipefail; gcc -o ci/sdl2_smoke ci/sdl2_smoke.c -lSDL2 2>&1 | tee -a ci/compile_smoke.log)
 
+      - name: Compile Vulkan smoke test
+        if: success()
+        run: |
+          echo "Compiling Vulkan smoke test"
+          set -o pipefail
+          gcc -o ci/vulkan_smoke ci/vulkan_smoke.c `pkg-config --cflags --libs sdl2` -lvulkan 2>&1 | tee ci/compile_vulkan_smoke.log
+
       - name: Run SDL2 smoke test (dummy audio)
         if: success()
         env:
@@ -81,3 +88,61 @@ jobs:
           path: |
             ci/sdl2_smoke
             build.log
+            ci/compile_smoke.log
+            ci/vulkan_smoke
+            ci/compile_vulkan_smoke.log
+
+  build-sdl2-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        msystem: [MINGW64]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-minizip
+
+      - name: Build project (Windows, SDL2)
+        run: |
+          set -o pipefail
+          echo "MSYSTEM=$MSYSTEM"
+          echo "gcc --version:"; gcc --version || true
+          echo "make --version:"; make --version || true
+          make clean
+          make USE_SDL2=1 2>&1 | tee build-win.log
+          make dedicated USE_SDL2=1 2>&1 | tee -a build-win.log
+
+      - name: Compile Vulkan smoke test (Windows)
+        run: |
+          set -o pipefail
+          echo "Compiling Vulkan smoke test (object only)"
+          gcc -c -o ci/vulkan_smoke.o ci/vulkan_smoke.c `pkg-config --cflags sdl2` 2>&1 | tee compile-vulkan-smoke-win.log
+
+      - name: Upload Windows build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdl2-windows-ci-logs-${{ matrix.msystem }}
+          if-no-files-found: warn
+          path: |
+            build-win.log
+            compile-vulkan-smoke-win.log
+            ci/vulkan_smoke.o
