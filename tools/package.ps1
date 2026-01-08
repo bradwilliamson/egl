@@ -2,7 +2,9 @@ param(
     [string]$OutDir = "out\\egl",
     [switch]$SkipBuild,
     [switch]$SkipDedicated,
-    [switch]$NoPkzCopy
+    [switch]$NoPkzCopy,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$MakeArgs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,11 +31,13 @@ $outBase = Join-Path $outRoot 'baseq2'
 New-Item -ItemType Directory -Force -Path $outBase | Out-Null
 
 if (-not $SkipBuild) {
-    & make all
+    if (-not $MakeArgs) { $MakeArgs = @() }
+
+    & make @MakeArgs all
     if ($LASTEXITCODE -ne 0) { throw "make all failed with exit code $LASTEXITCODE" }
 
     if (-not $SkipDedicated) {
-        & make dedicated
+        & make @MakeArgs dedicated
         if ($LASTEXITCODE -ne 0) { throw "make dedicated failed with exit code $LASTEXITCODE" }
     }
 }

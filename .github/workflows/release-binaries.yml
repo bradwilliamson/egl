@@ -1,0 +1,107 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config libjpeg-dev libpng-dev libminizip-dev zip
+
+      - name: Build + stage portable folder (Linux)
+        run: |
+          bash tools/package.sh
+
+      - name: Create zip
+        run: |
+          cd out
+          zip -r "egl-${{ github.ref_name }}-linux.zip" egl-linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: egl-${{ github.ref_name }}-linux
+          if-no-files-found: error
+          path: out/egl-${{ github.ref_name }}-linux.zip
+
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        msystem: [MINGW64]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-minizip
+
+      - name: Build + stage portable folder (Windows)
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\package.ps1 -OutDir "out\\egl-windows" USE_SDL2=1
+
+      - name: Create zip
+        shell: powershell
+        run: |
+          $zip = "egl-${{ github.ref_name }}-windows-x64.zip"
+          if (Test-Path $zip) { Remove-Item -Force $zip }
+          Compress-Archive -Path "out\\egl-windows" -DestinationPath $zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: egl-${{ github.ref_name }}-windows-x64
+          if-no-files-found: error
+          path: egl-${{ github.ref_name }}-windows-x64.zip
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-windows]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifacts
+        run: |
+          ls -la artifacts
+          find artifacts -type f -maxdepth 3 -print
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/egl-${{ github.ref_name }}-linux.zip
+            artifacts/**/egl-${{ github.ref_name }}-windows-x64.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
