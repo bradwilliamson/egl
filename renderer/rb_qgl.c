@@ -31,24 +31,47 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 // QGL_GetProcAddress () - returns the address of a gl function
 //
 
+
 #ifdef _WIN32
 
 # include "../renderer/r_local.h"
-# include "../win32/win_glimp.h"
 
-# define LOGPROC	(glwState.oglLogFP)
-# ifndef GL_GPA
-static void *QGL_WinGetProcAddress (const char *procName)
-{
-	void *proc = (void *)GetProcAddress (glwState.hInstOpenGL, procName);
-	if (!proc)
-		proc = (void *)wglGetProcAddress ((LPCSTR) procName);
-	return proc;
-}
+# ifdef HAVE_SDL2
+	/* SDL2 backend: don't depend on the Win32/WGL glwState. */
+	# include <windows.h>
+	# include <SDL2/SDL.h>
 
-# define GL_GPA(a)	QGL_WinGetProcAddress (a)
+	static HMODULE qgl_hInstOpenGL;
+	static FILE *qgl_oglLogFP;
+
+	# define LOGPROC	(qgl_oglLogFP)
+	static void *QGL_SDLGetProcAddress (const char *procName)
+	{
+		void *proc = (void *)SDL_GL_GetProcAddress (procName);
+		if (!proc && qgl_hInstOpenGL)
+			proc = (void *)GetProcAddress (qgl_hInstOpenGL, procName);
+		return proc;
+	}
+	# define GL_GPA(a)	QGL_SDLGetProcAddress (a)
+	# define SIG(x)		fprintf (qgl_oglLogFP, x "\n")
+
+# else
+	# include "../win32/win_glimp.h"
+
+	# define LOGPROC	(glwState.oglLogFP)
+	# ifndef GL_GPA
+	static void *QGL_WinGetProcAddress (const char *procName)
+	{
+		void *proc = (void *)GetProcAddress (glwState.hInstOpenGL, procName);
+		if (!proc)
+			proc = (void *)wglGetProcAddress ((LPCSTR) procName);
+		return proc;
+	}
+
+	# define GL_GPA(a)	QGL_WinGetProcAddress (a)
+	# endif
+	# define SIG(x)		fprintf (glwState.oglLogFP, x "\n")
 # endif
-# define SIG(x)		fprintf (glwState.oglLogFP, x "\n")
 
 #elif defined __unix__
 
@@ -3880,10 +3903,17 @@ Unloads the specified DLL then nulls out all the proc pointers.
 void QGL_Shutdown (void)
 {
 #ifdef _WIN32
+	# ifdef HAVE_SDL2
+	if (qgl_hInstOpenGL) {
+		FreeLibrary (qgl_hInstOpenGL);
+		qgl_hInstOpenGL = NULL;
+	}
+	# else
 	if (glwState.hInstOpenGL) {
 		FreeLibrary (glwState.hInstOpenGL);
 		glwState.hInstOpenGL = NULL;
 	}
+	# endif
 #elif defined __unix__
 	/* Not unloading because of the XCloseDisplay related bug, it will hopefully be fixed someday
 	if (glxState.OpenGLLib)
@@ -4319,7 +4349,11 @@ qBool QGL_Init (const char *dllName)
 	Com_Printf (0, "QGL_Init: LoadLibrary ( \"%s\" )", dllName);
 
 #ifdef _WIN32
+	# ifdef HAVE_SDL2
+	if (!(qgl_hInstOpenGL = LoadLibrary (dllName))) {
+	# else
 	if (!(glwState.hInstOpenGL = LoadLibrary (dllName))) {
+	# endif
 		char *buf = NULL;
 
 		FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
@@ -4333,7 +4367,11 @@ qBool QGL_Init (const char *dllName)
 		MessageBox (NULL, buf, "EGL Fatal Error", MB_OK|MB_ICONWARNING);
 
 		Com_Printf (0, "QGL_Init: LoadLibrary ( \"%s\" )", GL_DRIVERNAME);
+		# ifdef HAVE_SDL2
+		if (!(qgl_hInstOpenGL = LoadLibrary (GL_DRIVERNAME))) {
+		# else
 		if (!(glwState.hInstOpenGL = LoadLibrary (GL_DRIVERNAME))) {
+		# endif
 
 			FormatMessage (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
 							NULL,
