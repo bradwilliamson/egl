@@ -20,8 +20,6 @@ static SDL_GLContext sdl_glctx = NULL;
 glxState_t glxState;
 
 /* Platform cvars */
-static cVar_t *vid_xpos = NULL;
-static cVar_t *vid_ypos = NULL;
 cVar_t *vid_fullscreen = NULL;
 static cVar_t *gl_swap_control = NULL;
 static cVar_t *gl_swap_interval = NULL;
