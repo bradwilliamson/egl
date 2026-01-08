@@ -9,15 +9,23 @@ TODO: flesh out full mode enumeration/setting, input hookup, and gamma control.
 
 #include "../renderer/r_local.h"
 #include "../client/cl_local.h"
+#if defined(__unix__)
 #include "../unix/unix_glimp.h"
+#endif
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 #include <limits.h>
 
+#ifndef APPLICATION
+#define APPLICATION "EGL" EGL_VERSTR
+#endif
+
 static SDL_Window *sdl_window = NULL;
 static SDL_GLContext sdl_glctx = NULL;
 
+#if defined(__unix__)
 glxState_t glxState;
+#endif
 
 /* Platform cvars */
 cVar_t *vid_xpos = NULL;
