@@ -2,9 +2,9 @@ name: CI - SDL2 Build & Smoke Test
 
 on:
   push:
-    branches: [ main, sdl2-integration ]
+    branches: [ master, main, sdl2-integration, modernization-v1 ]
   pull_request:
-    branches: [ main ]
+    branches: [ master, main ]
   workflow_dispatch: {}
 
 jobs:
@@ -81,3 +81,48 @@ jobs:
           path: |
             ci/sdl2_smoke
             build.log
+
+  build-sdl2-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        msystem: [MINGW64]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-minizip
+
+      - name: Build project (Windows, SDL2)
+        run: |
+          set -o pipefail
+          echo "MSYSTEM=$MSYSTEM"
+          echo "gcc --version:"; gcc --version || true
+          echo "make --version:"; make --version || true
+          make clean
+          make USE_SDL2=1 2>&1 | tee build-win.log
+          make dedicated USE_SDL2=1 2>&1 | tee -a build-win.log
+
+      - name: Upload Windows build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdl2-windows-ci-logs-${{ matrix.msystem }}
+          if-no-files-found: warn
+          path: |
+            build-win.log

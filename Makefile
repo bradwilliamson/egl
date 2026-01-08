@@ -9,8 +9,8 @@ SDL2_SOURCES = sdl2/sdl_glimp.c sdl2/sdl_input.c sdl2/sdl_snd.c sdl2/sdl_main.c
 else
 SDL2_SOURCES =
 endif
-CFLAGS = -DWIN32 -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
-LDFLAGS = -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip
+CFLAGS += -DWIN32 -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
+LDFLAGS += -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip
 
 # Optional debug build (symbols + no optimization) for diagnosing crashes.
 DBG_CFLAGS = -DWIN32 -m64 -O0 -g3 -fno-omit-frame-pointer -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
@@ -30,7 +30,13 @@ DLL_LDFLAGS = -m64 -shared
 # Source files (adjust paths as needed)
 SHARED_SRC = $(wildcard shared/*.c)
 COMMON_SRC = $(filter-out common/zlib_stubs.c, $(wildcard common/*.c)) $(SHARED_SRC)
-CLIENT_SRC = $(wildcard client/*.c) $(wildcard win32/*.c) $(SDL2_SOURCES)
+ifdef USE_SDL2
+# SDL2 build: use SDL2 for video/input/sound, but still need core Win32 platform code
+WIN32_SYS_SRC = win32/win_main.c win32/win_console.c win32/win_sock.c
+CLIENT_SRC = $(wildcard client/*.c) $(WIN32_SYS_SRC) $(SDL2_SOURCES)
+else
+CLIENT_SRC = $(wildcard client/*.c) $(wildcard win32/*.c)
+endif
 CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
 GAME_SRC = $(wildcard game/*.c)
 RENDERER_SRC = $(wildcard renderer/*.c)
