@@ -59,6 +59,7 @@ cVar_t	*r_ext_vertexProgram;
 cVar_t	*gl_finish;
 cVar_t	*gl_flashblend;
 cVar_t	*gl_lightmap;
+cVar_t	*gl_coloredlightmaps;
 cVar_t	*gl_lockpvs;
 cVar_t	*gl_log;
 cVar_t	*gl_maxTexSize;
@@ -1202,6 +1203,7 @@ static void R_Register (void)
 	gl_finish			= Cvar_Register ("gl_finish",			"0",			CVAR_ARCHIVE);
 	gl_flashblend		= Cvar_Register ("gl_flashblend",		"0",			CVAR_ARCHIVE);
 	gl_lightmap			= Cvar_Register ("gl_lightmap",			"0",			CVAR_CHEAT);
+	gl_coloredlightmaps	= Cvar_Register ("gl_coloredlightmaps",	"1",			CVAR_ARCHIVE);
 	gl_lockpvs			= Cvar_Register ("gl_lockpvs",			"0",			CVAR_CHEAT);
 	gl_log				= Cvar_Register ("gl_log",				"0",			0);
 	gl_maxTexSize		= Cvar_Register ("gl_maxTexSize",		"0",			CVAR_ARCHIVE|CVAR_LATCH_VIDEO);

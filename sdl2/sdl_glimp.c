@@ -59,6 +59,9 @@ void SDL2_SetMouseGrab (qBool grab)
     if (!sdl_window)
         return;
 
+    // Keep OS cursor from reappearing when the window is re-created (e.g. vid_restart)
+    // and relative mode is temporarily lost.
+    SDL_ShowCursor (grab ? SDL_DISABLE : SDL_ENABLE);
     SDL_SetRelativeMouseMode (grab ? SDL_TRUE : SDL_FALSE);
     SDL_SetWindowGrab (sdl_window, grab ? SDL_TRUE : SDL_FALSE);
 }
@@ -283,6 +286,9 @@ void VID_CheckChanges (refConfig_t *outConfig)
 
         Snd_Init ();
         CL_MediaInit ();
+
+        // Restart input after a vid_restart so we reapply SDL relative mouse mode/grab.
+        IN_Restart_f ();
 
         cls.disableScreen = qFalse;
 
