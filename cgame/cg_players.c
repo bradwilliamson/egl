@@ -117,8 +117,12 @@ void CG_LoadClientinfo (clientInfo_t *ci, char *skin)
 	char		modelFilename[MAX_QPATH];
 	char		skinFilename[MAX_QPATH];
 	char		weaponFilename[MAX_QPATH];
+	char		debugBuf[256];
 	char		*t;
 	int			i;
+
+	Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: loading '%s'\n", skin);
+	cgi.Com_DevPrintf (0, debugBuf);
 
 	Q_strncpyz (ci->cInfo, skin, sizeof (ci->cInfo));
 
@@ -184,6 +188,8 @@ void CG_LoadClientinfo (clientInfo_t *ci, char *skin)
 		// Skin file
 		Q_snprintfz (skinFilename, sizeof (skinFilename), "players/%s/%s.tga", modelName, skinName);
 		ci->material = cgi.R_RegisterSkin (skinFilename);
+		Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: tried skin '%s' -> %s\n", skinFilename, ci->material ? "OK" : "FAILED");
+		cgi.Com_DevPrintf (0, debugBuf);
 
 		// If we don't have the skin and the model wasn't male, see if the male has it (this is for CTF's skins)
 		if (!ci->material && Q_stricmp (modelName, "male")) {
@@ -195,13 +201,17 @@ void CG_LoadClientinfo (clientInfo_t *ci, char *skin)
 			// See if the skin exists for the male model
 			Q_snprintfz (skinFilename, sizeof (skinFilename), "players/%s/%s.tga", modelName, skinName);
 			ci->material = cgi.R_RegisterSkin (skinFilename);
+			Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: fallback male skin '%s' -> %s\n", skinFilename, ci->material ? "OK" : "FAILED");
+			cgi.Com_DevPrintf (0, debugBuf);
 		}
 
 		// If we still don't have a skin, it means that the male model didn't have it, so default to grunt
 		if (!ci->material) {
 			// See if the skin exists for the male model
-			Q_snprintfz (skinFilename, sizeof (skinFilename), "players/%s/grunt.tga", modelName, skinName);
+			Q_snprintfz (skinFilename, sizeof (skinFilename), "players/%s/grunt.tga", modelName);
 			ci->material = cgi.R_RegisterSkin (skinFilename);
+			Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: fallback grunt skin '%s' -> %s\n", skinFilename, ci->material ? "OK" : "FAILED");
+			cgi.Com_DevPrintf (0, debugBuf);
 		}
 
 		// Weapon file
@@ -223,14 +233,24 @@ void CG_LoadClientinfo (clientInfo_t *ci, char *skin)
 		ci->icon = cgi.R_RegisterPic (ci->iconName);
 	}
 
-	// Must have loaded all data types to be valud
+	// Must have loaded all data types to be valid
 	if (!ci->material || !ci->icon || !ci->model || !ci->weaponModels[0]) {
-		ci->material = NULL;
-		ci->icon = NULL;
-		ci->model = NULL;
-		ci->weaponModels[0] = NULL;
-		return;
+		Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: partial load for '%s' (mat=%p icon=%p model=%p weapon=%p)\n",
+			ci->cInfo, (void*)ci->material, (void*)ci->icon, (void*)ci->model, (void*)ci->weaponModels[0]);
+		cgi.Com_DevPrintf (PRNT_WARNING, debugBuf);
+		
+		// Don't clear everything - allow partial rendering with whatever we have
+		// Only clear if we have absolutely nothing useful
+		if (!ci->model) {
+			ci->material = NULL;
+			ci->icon = NULL;
+			ci->weaponModels[0] = NULL;
+			return;
+		}
 	}
+
+	Q_snprintfz (debugBuf, sizeof (debugBuf), "CG_LoadClientinfo: SUCCESS for '%s'\n", ci->cInfo);
+	cgi.Com_DevPrintf (0, debugBuf);
 }
 
 

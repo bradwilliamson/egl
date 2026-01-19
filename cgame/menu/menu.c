@@ -79,10 +79,12 @@ void JoinMenu_StartSStatus (void); // FIXME
 void M_Init (void)
 {
 	int		i;
+	Com_DevPrintf (0, "[cginit] M_Init begin\n");
 
    	// Register cvars
 	for (i=0 ; i<MAX_ADDRBOOK_SAVES ; i++)
 		cgi.Cvar_Register (Q_VarArgs ("adr%i", i),				"",			CVAR_ARCHIVE);
+	Com_DevPrintf (0, "[cginit] M_Init addrbook cvars registered\n");
 
 	ui_jsMenuPage		= cgi.Cvar_Register ("ui_jsMenuPage",	"0",		CVAR_ARCHIVE);
 	ui_jsSortItem		= cgi.Cvar_Register ("ui_jsSortItem",	"0",		CVAR_ARCHIVE);
@@ -121,6 +123,7 @@ void M_Init (void)
 	cmd_menuQuit		= cgi.Cmd_AddCommand ("menu_quit",			UI_QuitMenu_f,				"Opens the quit menu");
 
 	cmd_startSStatus	= cgi.Cmd_AddCommand ("ui_startSStatus",	JoinMenu_StartSStatus,		"");
+	Com_DevPrintf (0, "[cginit] M_Init commands registered\n");
 }
 
 

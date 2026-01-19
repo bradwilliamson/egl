@@ -525,7 +525,8 @@ size_t R_DrawStringLen (font_t *font, float x, float y, float xScale, float ySca
 	char	swap;
 	size_t	length;
 
-	assert(len);
+	if (!string || len == 0)
+		return 0;
 
 	swap = string[len];
 	string[len] = 0;

@@ -378,6 +378,7 @@ LRESULT CALLBACK MainWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 		}
 		goto end;
 
+#ifndef HAVE_SDL2
 	case WM_SYSKEYDOWN:
 		if (wParam == 13) {
 			Cvar_VariableSetValue (vid_fullscreen, !vid_fullscreen->intVal, qTrue);
@@ -393,6 +394,16 @@ LRESULT CALLBACK MainWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	case WM_KEYUP:
 		Key_Event (In_MapKey (wParam, lParam), qFalse, sys_winInfo.msgTime);
 		break;
+#else
+	case WM_SYSKEYDOWN:
+		// Alt+Enter for fullscreen toggle still handled in SDL2 build
+		if (wParam == 13) {
+			Cvar_VariableSetValue (vid_fullscreen, !vid_fullscreen->intVal, qTrue);
+			VID_Restart_f ();
+			return 0;
+		}
+		break;
+#endif
 
 	case WM_CLOSE:
 		Cbuf_AddText ("quit\n");

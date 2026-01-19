@@ -747,27 +747,26 @@ pasteIntoMessage:
 	if (key < 32 || key > 127)
 		return;
 
-	if (key_chatCursorPos < MAXCMDLINE-1) {
-		// Check insert mode
+	{
+		char *buf = key_chatBuffer[key_chatEditLine];
+		size_t len = strlen (buf);
+
+		if (key_chatCursorPos >= MAXCMDLINE - 1)
+			return;
+
+		// Clamp cursor into the current string bounds defensively
+		if (key_chatCursorPos > len)
+			key_chatCursorPos = len;
+
 		if (key_insertOn) {
-			// Can't do strcpy to move string to right
-			i = strlen (key_chatBuffer[key_chatEditLine]) - 1;
-
-			if (i == MAXCMDLINE-2) 
-				i--;
-
-			for ( ; i>=key_chatCursorPos ; i--)
-				key_chatBuffer[key_chatEditLine][i + 1] = key_chatBuffer[key_chatEditLine][i];
+			// Need one extra byte for the new char (NUL moves via memmove)
+			if (len >= MAXCMDLINE - 1)
+				return;
+			memmove (buf + key_chatCursorPos + 1, buf + key_chatCursorPos, len - key_chatCursorPos + 1);
 		}
 
-		// Only null terminate if at the end
-		i = key_chatBuffer[key_chatEditLine][key_chatCursorPos];
-		key_chatBuffer[key_chatEditLine][key_chatCursorPos] = key;
+		buf[key_chatCursorPos] = (char)key;
 		key_chatCursorPos++;
-		if (!i) {
-			for (i=key_chatCursorPos ; i<MAXCMDLINE ; i++)
-				key_chatBuffer[key_chatEditLine][i] = '\0';
-		}
 	}
 }
 
@@ -1174,6 +1173,10 @@ static void Key_ExecuteBind (keyNum_t keyNum, qBool isDown)
 
 void Key_Event (keyNum_t keyNum, qBool isDown, uint32 time)
 {
+	// Bounds check - ignore invalid key numbers
+	if (keyNum < 0 || keyNum >= K_MAXKEYS)
+		return;
+
 	// Update auto-repeat status
 	if (isDown) {
 		key_keyInfo[keyNum].repeated++;

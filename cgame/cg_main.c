@@ -588,13 +588,16 @@ CG_Init
 void CG_Init (void)
 {
 	char	*gameDir;
+	Com_DevPrintf (0, "[cginit] CG_Init begin\n");
 
 	// Clear everything
 	memset (&cg, 0, sizeof (cgState_t));
 	memset (&cgMedia, 0, sizeof (cgMedia_t));
 	memset (&uiMedia, 0, sizeof (uiMedia));
+	Com_DevPrintf (0, "[cginit] cleared state\n");
 
 	CG_ClearEntities ();
+	Com_DevPrintf (0, "[cginit] CG_ClearEntities done\n");
 
 	// This nastiness is done because I don't
 	// feel like compiling several cgame libraries...
@@ -613,32 +616,54 @@ void CG_Init (void)
 		cg.currGameMod = GAME_MOD_XATRIX;
 	else
 		cg.currGameMod = GAME_MOD_DEFAULT;
+	Com_DevPrintf (0, "[cginit] game mod detected (%d)\n", cg.currGameMod);
 
 	// Update refConfig
+	Com_DevPrintf (0, "[cginit] before R_GetRefConfig\n");
 	cgi.R_GetRefConfig (&cg.refConfig);
+	Com_DevPrintf (0, "[cginit] after R_GetRefConfig (%dx%d)\n", cg.refConfig.vidWidth, cg.refConfig.vidHeight);
 
 	// Copy config strings
+	Com_DevPrintf (0, "[cginit] before CG_CopyConfigStrings\n");
 	CG_CopyConfigStrings ();
+	Com_DevPrintf (0, "[cginit] after CG_CopyConfigStrings\n");
 
 	// Initialize early needed media
+	Com_DevPrintf (0, "[cginit] before CG_InitBaseMedia\n");
 	CG_InitBaseMedia ();
+	Com_DevPrintf (0, "[cginit] after CG_InitBaseMedia\n");
 
 	// Register cvars and commands
+	Com_DevPrintf (0, "[cginit] before V_Register\n");
 	V_Register ();
+	Com_DevPrintf (0, "[cginit] after V_Register\n");
+	Com_DevPrintf (0, "[cginit] before CG_WeapRegister\n");
 	CG_WeapRegister ();
+	Com_DevPrintf (0, "[cginit] after CG_WeapRegister\n");
+	Com_DevPrintf (0, "[cginit] before CG_RegisterMain\n");
 	CG_RegisterMain ();
+	Com_DevPrintf (0, "[cginit] after CG_RegisterMain\n");
 
 	// Check cvar sanity
+	Com_DevPrintf (0, "[cginit] before CG_UpdateCvars\n");
 	CG_UpdateCvars (qTrue);
+	Com_DevPrintf (0, "[cginit] after CG_UpdateCvars\n");
 
 	// Location system init
+	Com_DevPrintf (0, "[cginit] before CG_LocationInit\n");
 	CG_LocationInit ();
+	Com_DevPrintf (0, "[cginit] after CG_LocationInit\n");
 
 	// Map FX init
+	Com_DevPrintf (0, "[cginit] before CG_MapFXInit\n");
 	CG_MapFXInit ();
+	Com_DevPrintf (0, "[cginit] after CG_MapFXInit\n");
 
 	// Load the UI
+	Com_DevPrintf (0, "[cginit] before UI_Init\n");
 	UI_Init ();
+	Com_DevPrintf (0, "[cginit] after UI_Init\n");
+	Com_DevPrintf (0, "[cginit] CG_Init done\n");
 }
 
 

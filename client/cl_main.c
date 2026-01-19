@@ -341,6 +341,7 @@ done:
 	cls.serverMessage[0] = '\0';
 	cls.serverName[0] = '\0';
 	cls.serverProtocol = 0;
+	memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
 
 	Cvar_Set ("$mapname", "", qTrue);
 	Cvar_Set ("$game", "", qTrue);
@@ -387,49 +388,45 @@ static void CL_ClientConnect_CP (void)
 		return;
 	}
 
-	Com_DevPrintf (0, "client_connect: new\n");
+	Com_DevPrintf (0, "client_connect: new (protocol=%d)\n", cls.serverProtocol);
 
 	Netchan_Setup (NS_CLIENT, &cls.netChan, &cls.netFrom, cls.serverProtocol, cls.quakePort, 0);
 
-	// Parse arguments (R1Q2 enhanced protocol only)
+	// Use challenge extras for HTTP download server if available (q2repro approach)
+	// This uses the dlserver= parsed from the challenge rather than connect args
+#ifdef CL_HTTPDL
+	if (cls.challengeExtras.valid && cls.challengeExtras.dlserver[0]) {
+		buff = NET_AdrToString (&cls.netChan.remoteAddress);
+		Q_snprintfz (cls.download.httpReferer, sizeof (cls.download.httpReferer), "quake2://%s", buff);
+		CL_HTTPDL_SetServer (cls.challengeExtras.dlserver);
+		if (cls.download.httpServer[0])
+			Com_DevPrintf (0, "HTTP downloading enabled (from challenge), using '%s'\n", cls.download.httpServer);
+	}
+#endif
+
+	// Also parse connect arguments for backwards compatibility (R1Q2 enhanced protocol)
 	if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
 		buff = NET_AdrToString (&cls.netChan.remoteAddress);
 		for (i=1 ; i<Cmd_Argc() ; i++) {
 			p = Cmd_Argv (i);
 			if (!strncmp (p, "dlserver=", 9)) {
-#ifdef CL_HTTPL
-				p += 9;
-				Q_snprintfz (cls.download.httpReferer, sizeof (cls.download.httpReferer), "quake2://%s", buff);
-				CL_HTTPDL_SetServer (p);
-				if (cls.download.httpServer[0])
-					Com_DevPrintf (0, "HTTP downloading enabled, using '%s'\n", cls.download.httpServer);
-#endif
-			}
-#ifdef CL_ANTICHEAT
-			else if (!strncmp (p, "ac=", 3)) {
-				p += 3;
-				if (!p[0])
-					continue;
-				i = atoi (p);
-				if (i) {
-					MSG_WriteByte (&cls.netChan.message, CLC_NOP);
-					Netchan_Transmit (&cls.netChan, 0, NULL);
-
-					// Don't sit and stutter sounds while loading
-					Snd_StopAllSounds ();
-
-					// Let the GUI system know
-					// FIXME: Use this, durr
-					Com_Printf (0, "Loading and initializing the anticheat module, please wait.\n");
-					GUI_NamedGlobalEvent ("ACLoading");
-					SCR_UpdateScreen ();
-
-					// Load the API
-					if (!CL_ACAPI_Init ())
-						Com_Printf (PRNT_ERROR, "Anticheat failed to load, trying to connect without it.\n");
+#ifdef CL_HTTPDL
+				// Only use if not already set from challenge extras
+				if (!cls.download.httpServer[0]) {
+					p += 9;
+					Q_snprintfz (cls.download.httpReferer, sizeof (cls.download.httpReferer), "quake2://%s", buff);
+					CL_HTTPDL_SetServer (p);
+					if (cls.download.httpServer[0])
+						Com_DevPrintf (0, "HTTP downloading enabled (from connect), using '%s'\n", cls.download.httpServer);
 				}
-			}
 #endif
+			}
+// Disabled AC load to prevent hang/overflow
+// #ifdef CL_ANTICHEAT
+// 			else if (!strncmp (p, "ac=", 3)) {
+// 				...
+// 			}
+// #endif
 		}
 	}
 
@@ -493,6 +490,118 @@ static void CL_Ping_CP (void)
 
 /*
 =================
+CL_ParseChallengeExtras
+
+Parse all extras from the server's challenge response into cls.challengeExtras.
+This follows q2repro's approach of parsing challenge extras once and using
+the parsed result to drive connect packet generation.
+=================
+*/
+static void CL_ParseChallengeExtras (void)
+{
+	int i;
+	clChallengeExtras_t *ext = &cls.challengeExtras;
+
+	memset (ext, 0, sizeof (*ext));
+
+	for (i=2 ; i<Cmd_Argc() ; i++) {
+		const char *arg = Cmd_Argv (i);
+		const char *p;
+
+		if (!arg)
+			continue;
+
+		// Parse protocol list: p=34,35,...
+		if (!strncmp (arg, "p=", 2)) {
+			ext->sawProtocolList = qTrue;
+			p = arg + 2;
+
+			while (p && *p) {
+				char *end;
+				long proto = strtol (p, &end, 10);
+				if (end != p) {
+					if (proto == ORIGINAL_PROTOCOL_VERSION)
+						ext->sawOriginal = qTrue;
+					else if (proto == ENHANCED_PROTOCOL_VERSION)
+						ext->sawEnhanced = qTrue;
+					else if (proto == 26)
+						ext->sawProto26 = qTrue;
+					p = end;
+				}
+				else {
+					// Skip non-numeric token until separator/end
+					while (*p && *p != ',')
+						p++;
+				}
+
+				if (*p == ',')
+					p++;
+				else if (*p)
+					p++;
+			}
+			continue;
+		}
+
+		// Parse HTTP download server: dlserver=url
+		if (!strncmp (arg, "dlserver=", 9)) {
+			Q_strncpyz (ext->dlserver, arg + 9, sizeof (ext->dlserver));
+			continue;
+		}
+
+		// Future extras can be parsed here
+	}
+
+	ext->valid = qTrue;
+}
+
+
+/*
+=================
+CL_SelectProtocolFromExtras
+
+Select the best protocol to use based on parsed challenge extras.
+Returns the protocol number to use for the connect packet.
+=================
+*/
+static int CL_SelectProtocolFromExtras (void)
+{
+	clChallengeExtras_t *ext = &cls.challengeExtras;
+	int protocol;
+
+	// If user forced a protocol, use it
+	if (cl_protocol->intVal) {
+		Com_DevPrintf (0, "CL_SelectProtocolFromExtras: using forced cl_protocol %d\n", cl_protocol->intVal);
+		return cl_protocol->intVal;
+	}
+
+	// If the server advertises supported protocols, pick one deterministically.
+	// We prefer original (34) when multiple options are present - this matches
+	// observed behavior with modern servers that advertise both but work better with 34.
+	if (ext->sawProtocolList) {
+		if (ext->sawOriginal)
+			protocol = ORIGINAL_PROTOCOL_VERSION;
+		else if (ext->sawEnhanced)
+			protocol = ENHANCED_PROTOCOL_VERSION;
+		else if (ext->sawProto26)
+			protocol = 26;
+		else
+			protocol = ORIGINAL_PROTOCOL_VERSION;
+
+		Com_DevPrintf (0, "CL_SelectProtocolFromExtras: server advertised protocols, selected %d\n", protocol);
+		return protocol;
+	}
+
+	// Some servers don't advertise protocol flags in the challenge.
+	// In auto-detect mode, alternate between enhanced and original.
+	protocol = (cls.connectCount & 1) ? ORIGINAL_PROTOCOL_VERSION : ENHANCED_PROTOCOL_VERSION;
+	Com_DevPrintf (0, "CL_SelectProtocolFromExtras: no protocol list, trying %d (attempt %d)\n", protocol, cls.connectCount);
+
+	return protocol;
+}
+
+
+/*
+=================
 CL_Challenge_CP
 
 Challenge from the server we are connecting to
@@ -500,34 +609,30 @@ Challenge from the server we are connecting to
 */
 static void CL_Challenge_CP (void)
 {
-	char	*p;
-	int		protocol, i;
+	int protocol;
+	clChallengeExtras_t *ext = &cls.challengeExtras;
 
-	// Local challenge
+	// Store challenge number
 	cls.challenge = atoi (Cmd_Argv (1));
-	Com_DevPrintf (0, "client: received challenge\n");
+	Com_DevPrintf (0, "client: received challenge %u\n", cls.challenge);
 
-	// Flags
-	protocol = ORIGINAL_PROTOCOL_VERSION;
-	for (i=2 ; i<Cmd_Argc() ; i++) {
-		p = Cmd_Argv (i);
-		if (!strncmp (p, "p=", 2)) {
-			p += 2;
-			if (!p[0])
-				continue;
-			for ( ; ; ) {
-				i = atoi (p);
-				if (i == ENHANCED_PROTOCOL_VERSION)
-					protocol = i;
-				p = strchr (p, ',');
-				if (!p)
-					break;
-				p++;
-				if (!p[0])
-					break;
-			}
-		}
-	}
+	// Parse all challenge extras into cls.challengeExtras
+	CL_ParseChallengeExtras ();
+
+	// Select protocol based on parsed extras
+	protocol = CL_SelectProtocolFromExtras ();
+	ext->selectedProtocol = protocol;
+
+	// Log the decision
+	Com_DevPrintf (0, "client: challenge extras: valid=%d sawProtoList=%d orig=%d enh=%d p26=%d dlserver='%s'; selected=%d; cl_protocol=%d\n",
+		ext->valid ? 1 : 0,
+		ext->sawProtocolList ? 1 : 0,
+		ext->sawOriginal ? 1 : 0,
+		ext->sawEnhanced ? 1 : 0,
+		ext->sawProto26 ? 1 : 0,
+		ext->dlserver,
+		ext->selectedProtocol,
+		cl_protocol->intVal);
 
 	// Reset timer to avoid duplicates, and send the connect packet
 	cls.connectTime = cls.realTime;
@@ -779,6 +884,16 @@ static void CL_CheckForResend (void)
 	// Only resend every NET_RETRYDELAY
 	if (cls.realTime - cls.connectTime < NET_RETRYDELAY)
 		return;
+
+	if (cls.connectCount >= 20) {
+		Com_Printf (PRNT_ERROR, "Server connection timed out.\n");
+		cls.connectCount = 0;
+		cls.serverProtocol = 0;
+		memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
+		CL_SetState (CA_DISCONNECTED);
+		CL_CGModule_MainMenu ();
+		return;
+	}
 
 	// Check if it's a bad server address
 	if (!NET_StringToAdr (cls.serverName, &adr)) {
@@ -1093,6 +1208,7 @@ static void CL_Connect_f (void)
 		Com_DevPrintf (0, "Resetting protocol attempt since %s", NET_AdrToString (&adr));
 		Com_DevPrintf (0, " is not %s.\n", NET_AdrToString (&cls.netChan.remoteAddress));
 		cls.serverProtocol = 0;
+		memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
 	}
 
 	// Set the client state and prepare to connect
@@ -1117,6 +1233,7 @@ static void CL_Disconnect_f (void)
 		return;
 
 	cls.serverProtocol = 0;
+	memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
 	Com_Error (ERR_DROP, "Disconnected from server");
 }
 
