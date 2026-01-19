@@ -23,6 +23,8 @@ void GLimp_AppActivate (qBool active);
 static qBool sdl_appActive = qTrue;
 static qBool sdl_mouseGrabbed = qFalse;
 
+static void *cmd_in_restart = NULL;
+
 static void SDL2_SetGrabState (qBool grab)
 {
     if (sdl_mouseGrabbed == grab)
@@ -232,11 +234,19 @@ void IN_Init (void)
 {
     sdl_appActive = qTrue;
     SDL2_SetGrabState (qFalse);
+
+    if (!cmd_in_restart)
+        cmd_in_restart = Cmd_AddCommand ("in_restart", IN_Restart_f, "Restarts input subsystem");
 }
 
 void IN_Shutdown (void)
 {
     SDL2_SetGrabState (qFalse);
+
+    if (cmd_in_restart) {
+        Cmd_RemoveCommand ("in_restart", cmd_in_restart);
+        cmd_in_restart = NULL;
+    }
 }
 
 void IN_Activate (qBool active)
@@ -244,6 +254,21 @@ void IN_Activate (qBool active)
     // Force a new grab check in IN_Frame.
     if (!active)
         SDL2_SetGrabState (qFalse);
+}
+
+/*
+=================
+IN_Restart_f
+
+Needed after vid_restart: SDL window recreation can reset relative mouse mode.
+=================
+*/
+void IN_Restart_f (void)
+{
+    // Force a grab state re-apply.
+    sdl_mouseGrabbed = qFalse;
+    SDL2_SetGrabState (qFalse);
+    IN_Frame ();
 }
 
 /*

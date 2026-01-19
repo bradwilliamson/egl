@@ -8,6 +8,11 @@ A backup of EGL 0.3.1, as it was, from QuakeSrc back in 2007.
 The short-term focus is keeping builds working on Linux + Windows (MSYS2/MinGW64), especially via the SDL2 backend.
 Expect the build system and platform backends to continue evolving.
 
+## Notes (renderer + platform fixes)
+
+- `gl_coloredlightmaps`: older EGL builds could have this cvar set via configs, but it was not actually implemented in the renderer. This repo now implements it for Quake II BSP lightmaps.
+- SDL2 + `vid_restart`: the SDL2 backend now restores mouse grab/relative mode and hides the OS cursor after a restart.
+
 ## Running
 EGL is an engine; it expects Quake II base game data to be present.
 

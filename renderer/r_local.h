@@ -826,6 +826,7 @@ extern cVar_t	*r_ext_maxAnisotropy;
 extern cVar_t	*gl_finish;
 extern cVar_t	*gl_flashblend;
 extern cVar_t	*gl_lightmap;
+extern cVar_t	*gl_coloredlightmaps;
 extern cVar_t	*gl_lockpvs;
 extern cVar_t	*gl_log;
 extern cVar_t	*gl_maxTexSize;

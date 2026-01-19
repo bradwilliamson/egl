@@ -216,13 +216,17 @@ void GL_ResetAnisotropy (void)
 	uint32	i;
 	image_t	*image;
 	int		set;
+	int		maxAniso;
 
 	r_ext_maxAnisotropy->modified = qFalse;
 	if (!ri.config.extTexFilterAniso)
 		return;
 
 	// Change all the existing mipmap texture objects
-	set = clamp (r_ext_maxAnisotropy->intVal, 1, ri.config.maxAniso);
+	maxAniso = ri.config.maxAniso;
+	if (maxAniso < 1)
+		maxAniso = 1;
+	set = clamp (r_ext_maxAnisotropy->intVal, 1, maxAniso);
 	for (i=0, image=r_imageList ; i<r_numImages ; i++, image++) {
 		if (!image->touchFrame)
 			continue;	// Free r_imageList slot
@@ -1332,7 +1336,7 @@ static void R_UploadCMImage (char *name, byte **data, int width, int height, tex
 			qglTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 
 		if (ri.config.extTexFilterAniso)
-			qglTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, ri.config.maxAniso));
+			qglTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, (ri.config.maxAniso < 1) ? 1 : ri.config.maxAniso));
 
 		qglTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_TEXTURE_MIN_FILTER, ri.texMinFilter);
 		qglTexParameteri (GL_TEXTURE_CUBE_MAP_ARB, GL_TEXTURE_MAG_FILTER, ri.texMagFilter);
@@ -1494,7 +1498,7 @@ static void R_Upload2DImage (char *name, byte *data, int width, int height, texF
 			qglTexParameteri (GL_TEXTURE_2D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 
 		if (ri.config.extTexFilterAniso)
-			qglTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, ri.config.maxAniso));
+			qglTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, (ri.config.maxAniso < 1) ? 1 : ri.config.maxAniso));
 
 		qglTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, ri.texMinFilter);
 		qglTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, ri.texMagFilter);
@@ -1658,7 +1662,7 @@ static void R_Upload3DImage (char *name, byte **data, int width, int height, int
 			qglTexParameteri (GL_TEXTURE_3D, GL_GENERATE_MIPMAP_SGIS, GL_TRUE);
 
 		if (ri.config.extTexFilterAniso)
-			qglTexParameteri (GL_TEXTURE_3D, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, ri.config.maxAniso));
+			qglTexParameteri (GL_TEXTURE_3D, GL_TEXTURE_MAX_ANISOTROPY_EXT, clamp (r_ext_maxAnisotropy->intVal, 1, (ri.config.maxAniso < 1) ? 1 : ri.config.maxAniso));
 
 		qglTexParameteri (GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, ri.texMinFilter);
 		qglTexParameteri (GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, ri.texMagFilter);

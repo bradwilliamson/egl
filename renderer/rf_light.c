@@ -93,6 +93,10 @@ void R_Q2BSP_MarkWorldLights (void)
 	if (gl_flashblend->intVal)
 		return;
 
+	// gl_dynamic 2: keep switchable lightmap updates, but disable dlights.
+	if (gl_dynamic->intVal != 1)
+		return;
+
 	for (lt=ri.scn.dLightList, i=0 ; i<ri.scn.numDLights ; i++, lt++)
 		R_Q2BSP_r_MarkWorldLights (ri.scn.worldModel->bspModel.nodes, lt, 1<<i);
 }
@@ -150,7 +154,8 @@ void R_Q2BSP_MarkBModelLights (refEntity_t *ent, vec3_t mins, vec3_t maxs)
 	mBspNode_t		*node;
 	uint32			i;
 
-	if (!ri.scn.numDLights || gl_flashblend->intVal || !gl_dynamic->intVal || r_fullbright->intVal)
+	// gl_dynamic 2: keep switchable lightmap updates, but disable dlights.
+	if (!ri.scn.numDLights || gl_flashblend->intVal || gl_dynamic->intVal != 1 || r_fullbright->intVal)
 		return;
 
 	node = ent->model->bspModel.nodes + ent->model->q2BspModel.firstNode;
@@ -421,7 +426,7 @@ fullBright:
 	//
 	// Add dynamic lights
 	//
-	if (gl_dynamic->intVal && ri.scn.numDLights) {
+	if (gl_dynamic->intVal == 1 && ri.scn.numDLights) {
 		refDLight_t	*lt;
 		float		dist, add, intensity8, intensity;
 		vec3_t		dlOrigin;
@@ -507,12 +512,14 @@ static void R_Q2BSP_LightPoint (vec3_t point, vec3_t light)
 	//
 	// Add dynamic lights
 	//
-	for (lt=ri.scn.dLightList, num=0 ; num<ri.scn.numDLights ; num++, lt++) {
-		Vec3Subtract (point, lt->origin, dist);
-		add = (lt->intensity - Vec3Length (dist)) * (1.0f/256.0f);
+	if (gl_dynamic->intVal == 1 && ri.scn.numDLights) {
+		for (lt=ri.scn.dLightList, num=0 ; num<ri.scn.numDLights ; num++, lt++) {
+			Vec3Subtract (point, lt->origin, dist);
+			add = (lt->intensity - Vec3Length (dist)) * (1.0f/256.0f);
 
-		if (add > 0)
-			Vec3MA (light, add, lt->color, light);
+			if (add > 0)
+				Vec3MA (light, add, lt->color, light);
+		}
 	}
 }
 
@@ -658,6 +665,7 @@ static void R_Q2BSP_BuildLightMap (mBspSurface_t *surf, byte *dest, int stride)
 	float		*bl, max;
 	vec3_t		scale;
 	byte		*lightMap;
+	float		colorAmount;
 
 	if (surf->q2_texInfo->flags & (SURF_TEXINFO_SKY|SURF_TEXINFO_WARP))
 		Com_Error (ERR_DROP, "LM_BuildLightMap called for non-lit surface");
@@ -746,14 +754,17 @@ static void R_Q2BSP_BuildLightMap (mBspSurface_t *surf, byte *dest, int stride)
 			}
 		}
 
-		// Add all the dynamic lights
-		if (surf->dLightFrame == ri.frameCount)
+		// Add all the dynamic lights (gl_dynamic 1 only)
+		if (gl_dynamic->intVal == 1 && surf->dLightFrame == ri.frameCount)
 			R_Q2BSP_AddDynamicLights (surf);
 	}
 
 	// Put into texture format
 	stride -= (surf->q2_lmWidth << 2);
 	bl = surf->q2_blockLights;
+	colorAmount = 1.0f;
+	if (gl_coloredlightmaps)
+		colorAmount = clamp (gl_coloredlightmaps->floatVal, 0.0f, 1.0f);
 
 	for (i=0 ; i<surf->q2_lmHeight ; i++) {
 		for (j=0 ; j<surf->q2_lmWidth ; j++) {
@@ -765,28 +776,24 @@ static void R_Q2BSP_BuildLightMap (mBspSurface_t *surf, byte *dest, int stride)
 			if (bl[2] < 0)
 				bl[2] = 0;
 
-			// Determine the brightest of the three color components
-			max = bl[0];
-			if (bl[1] > max)
-				max = bl[1];
-			if (bl[2] > max)
-				max = bl[2];
-
-			// Normalize the color components to the highest channel
-			if (max > 255) {
-				max = 255.0f / max;
-
-				dest[0] = (byte)(bl[0]*max);
-				dest[1] = (byte)(bl[1]*max);
-				dest[2] = (byte)(bl[2]*max);
-				dest[3] = (byte)(255*max);
+			// Optional grayscale: lerp between grayscale intensity and colored light
+			if (colorAmount < 1.0f) {
+				float intensity = (bl[0] + bl[1] + bl[2]) * (1.0f / 3.0f);
+				bl[0] = intensity + (bl[0] - intensity) * colorAmount;
+				bl[1] = intensity + (bl[1] - intensity) * colorAmount;
+				bl[2] = intensity + (bl[2] - intensity) * colorAmount;
 			}
-			else {
-				dest[0] = (byte)bl[0];
-				dest[1] = (byte)bl[1];
-				dest[2] = (byte)bl[2];
-				dest[3] = 255;
-			}
+
+			// Clamp to 8-bit. This makes gl_modulate > 1 actually brighten the world
+			// (the previous "normalize into alpha" path wasn't used by the renderer).
+			if (bl[0] > 255) bl[0] = 255;
+			if (bl[1] > 255) bl[1] = 255;
+			if (bl[2] > 255) bl[2] = 255;
+
+			dest[0] = (byte)bl[0];
+			dest[1] = (byte)bl[1];
+			dest[2] = (byte)bl[2];
+			dest[3] = 255;
 
 			bl += 3;
 			dest += 4;
@@ -833,14 +840,20 @@ void R_Q2BSP_UpdateLightmap (mBspSurface_t *surf)
 	}
 
 	// Dynamic this frame or dynamic previously
+	// gl_dynamic:
+	// 0 - no updates (switchable lights won't animate)
+	// 1 - allow style updates + dlights
+	// 2 - allow style updates only (switchable lights), but disable dlights
 	if (gl_dynamic->intVal) {
 		for (map=0 ; map<surf->q2_numStyles ; map++) {
 			if (ri.scn.lightStyles[surf->q2_styles[map]].white != surf->q2_cachedLight[map])
 				goto dynamic;
 		}
 
-		if (surf->dLightFrame == ri.frameCount)
+		if (gl_dynamic->intVal == 1 && surf->dLightFrame == ri.frameCount) {
+			map = 0;
 			goto dynamic;
+		}
 	}
 
 	// No need to update
