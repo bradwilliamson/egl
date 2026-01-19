@@ -679,6 +679,8 @@ static qBool CL_ParseServerData (void)
 
 	cl.serverCount = MSG_ReadLong (&cls.netMessage);
 	cl.attractLoop = MSG_ReadByte (&cls.netMessage);
+	if (cl.attractLoop != 0 && cl.attractLoop != 1)
+		Com_Error (ERR_DROP, "CL_ParseServerData: invalid attractLoop %d", cl.attractLoop);
 
 	// BIG HACK to let demos from release work with the 3.0x patch!!!
 	if (i != ORIGINAL_PROTOCOL_VERSION && i != ENHANCED_PROTOCOL_VERSION && i != 26 && !cl.attractLoop)
@@ -952,6 +954,8 @@ void CL_ParseServerMessage (void)
 	static int	lastCmd = -2;
 	int			extraBits;
 	size_t		oldReadCount;
+	int			startMsec;
+	int			lastPumpMsec;
 
 	// If recording demos, copy the message out
 	if (cl_shownet->intVal == 1)
@@ -961,8 +965,26 @@ void CL_ParseServerMessage (void)
 
 	CL_CGModule_StartServerMessage ();
 
+	startMsec = Sys_Milliseconds ();
+	lastPumpMsec = startMsec;
+
 	// Parse the message
 	for ( ; ; ) {
+		// Keep the OS message loop responsive while parsing large/bad packets.
+		// Without this, Windows will mark the window as "Not Responding" (white screen).
+		if (Com_ClientState () >= CA_CONNECTING) {
+			int now = Sys_Milliseconds ();
+			if (now - lastPumpMsec > 50) {
+				Sys_SendKeyEvents ();
+				lastPumpMsec = now;
+			}
+			// Hard cap: if a single packet takes too long to parse, drop instead of hanging.
+			if (now - startMsec > 5000) {
+				Com_Error (ERR_DROP, "CL_ParseServerMessage: parsing server message took too long");
+				break;
+			}
+		}
+
 		if (cls.netMessage.readCount > cls.netMessage.curSize) {
 			Com_Error (ERR_DROP, "CL_ParseServerMessage: Bad server message");
 			break;
@@ -1094,7 +1116,6 @@ void CL_ParseServerMessage (void)
 		case SVC_PLAYERINFO:
 		case SVC_PACKETENTITIES:
 		case SVC_DELTAPACKETENTITIES:
-			assert (0);
 			Com_Error (ERR_DROP, "CL_ParseServerMessage: Out of place frame data");
 			break;
 
@@ -1116,13 +1137,22 @@ void CL_ParseServerMessage (void)
 				break;
 
 			// Unknown to the client and CGame failed to parse it so...
-			assert (0);
+			{
+				const char *cmdStr = (cmd >= 0 && cmd < 256) ? cl_svcStrings[cmd] : "SVC_<invalid>";
+				const char *lastStr;
+				if (lastCmd == -2)
+					lastStr = "None";
+				else if (lastCmd >= 0 && lastCmd < 256)
+					lastStr = cl_svcStrings[lastCmd];
+				else
+					lastStr = "SVC_<invalid>";
 			Com_Error (ERR_DROP, "CL_ParseServerMessage: Illegible server message\n"
 				"Message #%i: %s\n"
 				"Last #%i: %s\n"
 				"Try 'set cl_protocol 34' before connecting, a protocol change could be causing problems",
-				cmd, cl_svcStrings[cmd],
-				lastCmd, (lastCmd == -2) ? "None" : cl_svcStrings[lastCmd]);
+				cmd, cmdStr,
+				lastCmd, lastStr);
+			}
 			break;
 		}
 

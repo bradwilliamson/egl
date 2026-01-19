@@ -9,6 +9,49 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Find-Msys2Root {
+    param(
+        [string[]]$Candidates
+    )
+
+    foreach ($c in $Candidates) {
+        if (-not $c) { continue }
+        try {
+            $root = (Resolve-Path -LiteralPath $c -ErrorAction Stop).Path
+        } catch {
+            continue
+        }
+        if (Test-Path -LiteralPath (Join-Path $root 'mingw64\bin\gcc.exe')) {
+            return $root
+        }
+    }
+
+    return $null
+}
+
+function Find-Msys2ToolchainBin {
+    param(
+        [string]$Msys2Root
+    )
+
+    if (-not $Msys2Root) { return $null }
+
+    $bins = @(
+        'mingw64\bin',
+        'ucrt64\bin',
+        'clang64\bin'
+    )
+
+    foreach ($b in $bins) {
+        $binPath = Join-Path $Msys2Root $b
+        if (Test-Path -LiteralPath (Join-Path $binPath 'gcc.exe')) {
+            return $binPath
+        }
+    }
+
+    return $null
+}
+
 function Get-RepoRoot {
     (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
@@ -17,10 +60,45 @@ $root = Get-RepoRoot
 Set-Location $root
 
 # Ensure MinGW toolchain is available when running from a fresh PowerShell.
-$msys2Root = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT } else { 'C:\msys64' }
-$mingwBin = Join-Path $msys2Root 'mingw64\bin'
-if (-not ($env:PATH -split ';' | Where-Object { $_ -ieq $mingwBin })) {
-    $env:PATH = "$mingwBin;" + $env:PATH
+$candidateRoots = @(
+    $env:MSYS2_ROOT,
+    $env:MSYS2ROOT,
+    'C:\msys64',
+    'D:\msys64',
+    $(if ($env:RUNNER_TEMP) { Join-Path $env:RUNNER_TEMP 'msys64' } else { $null }),
+    $(if ($env:TEMP) { Join-Path $env:TEMP 'msys64' } else { $null }),
+    'C:\tools\msys64'
+)
+
+$msys2Root = Find-Msys2Root -Candidates $candidateRoots
+if (-not $msys2Root) {
+    $msys2Root = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT } else { 'C:\msys64' }
+}
+
+$toolchainBin = Find-Msys2ToolchainBin -Msys2Root $msys2Root
+if (-not $toolchainBin) {
+    $expected = @(
+        (Join-Path $msys2Root 'mingw64\bin\gcc.exe'),
+        (Join-Path $msys2Root 'ucrt64\bin\gcc.exe'),
+        (Join-Path $msys2Root 'clang64\bin\gcc.exe')
+    ) -join "\n  - "
+    throw "Could not find gcc.exe under detected MSYS2 root '$msys2Root'. Expected one of:\n  - $expected\n\nInstall MSYS2 + a toolchain (e.g. mingw-w64-x86_64-toolchain or mingw-w64-ucrt-x86_64-toolchain), or set MSYS2_ROOT to your MSYS2 install folder."
+}
+
+if (-not ($env:PATH -split ';' | Where-Object { $_ -ieq $toolchainBin })) {
+    $env:PATH = "$toolchainBin;" + $env:PATH
+}
+
+if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+    throw "gcc is still not discoverable after updating PATH with '$toolchainBin'. Current PATH does not allow running the toolchain."
+}
+
+# If USE_SDL2=1 was requested, sanity-check that SDL2 headers exist under the detected MSYS2 root.
+if ($MakeArgs -and ($MakeArgs | Where-Object { $_ -match '^(?:USE_SDL2=1|USE_SDL2\s*=\s*1)$' })) {
+    $sdlHeader = Join-Path $msys2Root 'mingw64\include\SDL2\SDL.h'
+    if (-not (Test-Path -LiteralPath $sdlHeader)) {
+        throw "SDL2 headers not found at '$sdlHeader'. Ensure MSYS2 SDL2 is installed (package: mingw-w64-x86_64-SDL2) and MSYS2_ROOT points at the correct MSYS2 install."
+    }
 }
 
 $outRootPath = Join-Path $root $OutDir
@@ -32,6 +110,10 @@ New-Item -ItemType Directory -Force -Path $outBase | Out-Null
 
 if (-not $SkipBuild) {
     if (-not $MakeArgs) { $MakeArgs = @() }
+
+    # Avoid stale objects when switching build flags (e.g. USE_SDL2 on/off).
+    & make clean
+    if ($LASTEXITCODE -ne 0) { throw "make clean failed with exit code $LASTEXITCODE" }
 
     & make @MakeArgs all
     if ($LASTEXITCODE -ne 0) { throw "make all failed with exit code $LASTEXITCODE" }
@@ -48,6 +130,24 @@ if (-not (Test-Path -LiteralPath $clientExe)) {
     throw "Missing egl.exe. Run without -SkipBuild or build it first." 
 }
 Copy-Item -Force -Path $clientExe -Destination (Join-Path $outRoot 'egl.exe')
+
+# If USE_SDL2=1 was requested, stage SDL2.dll next to the exe so it runs without MSYS2 on PATH.
+if ($MakeArgs -and ($MakeArgs | Where-Object { $_ -match '^(?:USE_SDL2=1|USE_SDL2\s*=\s*1)$' })) {
+    $sdlDll = Join-Path $toolchainBin 'SDL2.dll'
+    if (-not (Test-Path -LiteralPath $sdlDll)) {
+        throw "SDL2.dll not found at '$sdlDll'. Ensure MSYS2 SDL2 runtime is installed for your prefix (e.g. mingw-w64-x86_64-SDL2)."
+    }
+    Copy-Item -Force -Path $sdlDll -Destination (Join-Path $outRoot 'SDL2.dll')
+}
+
+# Stage required MinGW runtime DLLs (minizip, zlib, bzip2)
+$runtimeDlls = @('libminizip-1.dll', 'zlib1.dll', 'libbz2-1.dll')
+foreach ($dll in $runtimeDlls) {
+    $dllPath = Join-Path $toolchainBin $dll
+    if (Test-Path -LiteralPath $dllPath) {
+        Copy-Item -Force -Path $dllPath -Destination (Join-Path $outRoot $dll)
+    }
+}
 
 $dedExe = Join-Path $root 'eglded.exe'
 if (-not $SkipDedicated -and (Test-Path -LiteralPath $dedExe)) {

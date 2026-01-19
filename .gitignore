@@ -80,3 +80,7 @@ compile_commands.json
 Thumbs.db
 *.swp
 *.swo
+
+# Local runtime-generated files
+/eglcfg.cfg
+/console.log

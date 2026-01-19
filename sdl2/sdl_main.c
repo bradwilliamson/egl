@@ -7,7 +7,16 @@
  */
 
 #include "../client/cl_local.h"
-#include <SDL2/SDL.h>
+#define SDL_MAIN_HANDLED 1
+#if defined(__has_include)
+#  if __has_include(<SDL2/SDL.h>)
+#    include <SDL2/SDL.h>
+#  else
+#    include <SDL2/SDL.h>
+#  endif
+#else
+#  include <SDL2/SDL.h>
+#endif
 
 void SDL2_InitHook (void)
 {

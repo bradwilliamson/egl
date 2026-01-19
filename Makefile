@@ -1,10 +1,24 @@
 # Basic Makefile for EGL Quake 2 on MinGW (Windows)
+CC ?= gcc
+
+# Some Windows environments set CC=cc by default, but don't actually provide a 'cc' executable.
+# If the caller wants a specific compiler, they can still override CC on the command line.
+ifeq ($(CC),cc)
 CC = gcc
+endif
 
 # Optional SDL2 backend (set USE_SDL2=1 to enable)
 ifdef USE_SDL2
-CFLAGS += -DHAVE_SDL2
-LDFLAGS += -lSDL2
+# Allow overriding MSYS2 location/prefix via env or make vars.
+MSYS2_ROOT ?= $(or $(EGL_MSYS2_ROOT),C:/msys64)
+MSYS2_PREFIX ?= $(or $(EGL_MSYS2_PREFIX),mingw64)
+
+SDL2_INC_DIR = $(MSYS2_ROOT)/$(MSYS2_PREFIX)/include/SDL2
+SDL2_LIB_DIR = $(MSYS2_ROOT)/$(MSYS2_PREFIX)/lib
+SDL2_DLL_SRC = $(MSYS2_ROOT)/$(MSYS2_PREFIX)/bin/SDL2.dll
+
+CFLAGS += -DHAVE_SDL2 -I"$(SDL2_INC_DIR)"
+LDFLAGS += -L"$(SDL2_LIB_DIR)" -lSDL2
 SDL2_SOURCES = sdl2/sdl_glimp.c sdl2/sdl_input.c sdl2/sdl_snd.c sdl2/sdl_main.c
 else
 SDL2_SOURCES =
@@ -69,6 +83,9 @@ debug:
 
 egl.exe: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
+ifdef USE_SDL2
+	-powershell -NoProfile -Command "if (Test-Path -LiteralPath '$(SDL2_DLL_SRC)') { Copy-Item -Force -LiteralPath '$(SDL2_DLL_SRC)' -Destination 'SDL2.dll' } else { throw 'SDL2.dll not found at $(SDL2_DLL_SRC). Install MSYS2 SDL2 for your prefix (e.g. mingw-w64-x86_64-SDL2) or set EGL_MSYS2_ROOT/EGL_MSYS2_PREFIX.' }"
+endif
 
 $(CGAME_DLL): $(CGAME_OBJ) $(SHARED_OBJ) cgame/exports.def
 	$(CC) -o $@ $(DLL_LDFLAGS) $(CGAME_OBJ) $(SHARED_OBJ) cgame/exports.def

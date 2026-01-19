@@ -6,7 +6,15 @@ should be implemented later.
 */
 
 #include "../client/cl_local.h"
-#include <SDL2/SDL.h>
+#if defined(__has_include)
+#  if __has_include(<SDL2/SDL.h>)
+#    include <SDL2/SDL.h>
+#  else
+#    include <SDL.h>
+#  endif
+#else
+#  include <SDL2/SDL.h>
+#endif
 
 void SDL2_SetMouseGrab (qBool grab);
 void SDL2_OnWindowResized (int width, int height);
@@ -116,6 +124,9 @@ void SDL2_PollInputEvents (void)
             break;
 
         case SDL_KEYDOWN: {
+            /* Ignore SDL key repeat - the engine handles its own repeat logic */
+            if (ev.key.repeat)
+                break;
             keyNum_t k = SDL2_TranslateKey (ev.key.keysym.sym);
             if (k != K_BADKEY)
                 Key_Event ((int)k, qTrue, Sys_Milliseconds ());

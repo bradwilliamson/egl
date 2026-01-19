@@ -811,6 +811,7 @@ void CL_CGameAPI_Init (void)
 	// Call to init
 	CGI_Com_DevPrintf (0, "cgame->Init()\n");
 	cge->Init ();
+	CGI_Com_DevPrintf (0, "cgame->Init() returned\n");
 
 	CGI_Com_DevPrintf (0, "----------------------------------------\n");
 }

@@ -4,7 +4,15 @@
 
 #include "../client/snd_local.h"
 #include "../unix/unix_local.h"
-#include <SDL2/SDL.h>
+#if defined(__has_include)
+#  if __has_include(<SDL2/SDL.h>)
+#    include <SDL2/SDL.h>
+#  else
+#    include <SDL.h>
+#  endif
+#else
+#  include <SDL2/SDL.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -19,38 +27,56 @@ static cVar_t *s_sdl_buffer_ms; /* desired buffer size in milliseconds */
 static SDL_AudioDeviceID s_sdl_dev = 0;
 static SDL_AudioSpec s_sdl_want, s_sdl_have;
 
-/* Local ring state */
-static int s_sdl_buf_bytes = 0;
-static int s_sdl_read_pos = 0; /* byte offset read by callback */
+/* Local ring state - position in BYTES */
+static volatile int s_sdl_buf_bytes = 0;
+static volatile int s_sdl_play_pos = 0; /* byte offset being played (read by callback) */
 
-/* Callback: fill stream from snd_audioDMA.buffer */
+static int Snd_SDL_NextPow2 (int x)
+{
+    int p;
+
+    if (x <= 0)
+        return 1;
+
+    p = 1;
+    while (p < x && p > 0)
+        p <<= 1;
+
+    return (p > 0) ? p : x;
+}
+
+/* Callback: fill stream from snd_audioDMA.buffer
+ * This runs in a separate audio thread - must be careful about shared state.
+ */
 static void SDLAudioCallback (void *userdata, Uint8 *stream, int len)
 {
-    if (!snd_audioDMA.buffer || snd_audioDMA.samples == 0) {
+    byte *buf = snd_audioDMA.buffer;
+    int bufsize = s_sdl_buf_bytes;
+    
+    if (!buf || bufsize == 0 || snd_audioDMA.samples == 0) {
         SDL_memset (stream, 0, len);
         return;
     }
 
-    int bufsize = s_sdl_buf_bytes;
-    int read = s_sdl_read_pos;
-
-    while (len > 0) {
-        int chunk = bufsize - read;
-        if (chunk > len) chunk = len;
-        memcpy (stream, snd_audioDMA.buffer + read, chunk);
-        stream += chunk;
-        len -= chunk;
-        read += chunk;
-        if (read >= bufsize) read = 0;
+    int pos = s_sdl_play_pos;
+    Uint8 *out = stream;
+    int remaining = len;
+    
+    while (remaining > 0) {
+        int avail = bufsize - pos;
+        int chunk = (avail < remaining) ? avail : remaining;
+        
+        memcpy (out, buf + pos, chunk);
+        
+        out += chunk;
+        remaining -= chunk;
+        pos += chunk;
+        
+        if (pos >= bufsize) 
+            pos = 0;
     }
 
-    s_sdl_read_pos = read;
-
-    /* advance sample pos (mono samples) */
-    if (snd_audioDMA.sampleBits/8 > 0) {
-        int bytes_per_sample = (snd_audioDMA.sampleBits/8) * snd_audioDMA.channels;
-        snd_audioDMA.samplePos = s_sdl_read_pos / bytes_per_sample;
-    }
+    s_sdl_play_pos = pos;
 }
 
 qBool Snd_SDL_Init (void)
@@ -88,12 +114,26 @@ qBool Snd_SDL_Init (void)
     int buf_ms = s_sdl_buffer_ms ? s_sdl_buffer_ms->intVal : 200;
     if (buf_ms < 50) buf_ms = 50;
 
-    int mono_samples = (speed * buf_ms) / 1000;
-    snd_audioDMA.samples = mono_samples;
-    snd_audioDMA.submissionChunk = 1024; /* conservative chunk */
+    /*
+     * IMPORTANT: snd_audioDMA.samples is defined as MONO samples in the buffer
+     * (i.e. frames * channels). The DMA mixer assumes snd_audioDMA.samples is
+     * a power-of-two and uses (samples - 1) as a wrap mask.
+     */
+    {
+        const int bytes_per_mono_sample = bits / 8;
+        int desired_frames = (speed * buf_ms) / 1000;
+        int desired_mono_samples = desired_frames * channels;
 
-    int bytes_per_sample = (bits/8) * channels;
-    s_sdl_buf_bytes = mono_samples * bytes_per_sample;
+        /* Ensure a power-of-two ring size for mask-based wrap. */
+        snd_audioDMA.samples = Snd_SDL_NextPow2 (desired_mono_samples);
+
+        /* Keep submissionChunk a power-of-two for alignment masking. */
+        snd_audioDMA.submissionChunk = 1024;
+        if (snd_audioDMA.submissionChunk > snd_audioDMA.samples)
+            snd_audioDMA.submissionChunk = snd_audioDMA.samples;
+
+        s_sdl_buf_bytes = snd_audioDMA.samples * bytes_per_mono_sample;
+    }
 
     if (snd_audioDMA.buffer) Mem_Free (snd_audioDMA.buffer);
     snd_audioDMA.buffer = (byte *) Mem_Alloc (s_sdl_buf_bytes);
@@ -124,9 +164,10 @@ qBool Snd_SDL_Init (void)
 
     /* Start playback */
     SDL_PauseAudioDevice (s_sdl_dev, 0);
-    s_sdl_read_pos = 0;
+    s_sdl_play_pos = 0;
 
-    Com_Printf (0, "Snd_SDL_Init: audio %d Hz, %d-bit, %d channels, buffer %d ms\n", speed, bits, channels, buf_ms);
+    Com_Printf (0, "Snd_SDL_Init: audio %d Hz, %d-bit, %d channels, buffer %d ms (%d bytes)\n", 
+                speed, bits, channels, buf_ms, s_sdl_buf_bytes);
 
     return qTrue;
 }
@@ -150,8 +191,27 @@ void Snd_SDL_Shutdown (void)
 
 int Snd_SDL_GetDMAPos (void)
 {
-    /* Return current sample position (mono samples) */
-    return snd_audioDMA.samplePos;
+    /* Return current play position in MONO SAMPLES (individual samples, not frames).
+     * The DMA engine divides this by channels to get sample frames.
+     * snd_audioDMA.samples is the total mono samples in the buffer.
+     * 
+     * The code in snd_dma.c does:
+     *   snd_dmaSoundTime = buffers*fullSamples + samplePos/snd_audioDMA.channels;
+     * where fullSamples = snd_audioDMA.samples / snd_audioDMA.channels
+     * So samplePos must be in mono samples, range [0, snd_audioDMA.samples).
+     */
+    if (!snd_audioDMA.buffer || snd_audioDMA.samples == 0)
+        return 0;
+    
+    int bytes_per_sample = snd_audioDMA.sampleBits / 8;
+    if (bytes_per_sample <= 0)
+        return 0;
+    
+    /* Convert byte position to mono samples */
+    int sample_pos = s_sdl_play_pos / bytes_per_sample;
+    
+    /* Ensure it's within bounds */
+    return sample_pos % snd_audioDMA.samples;
 }
 
 void Snd_SDL_BeginPainting (void)

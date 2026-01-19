@@ -228,6 +228,10 @@ int Netchan_Transmit (netChan_t *chan, size_t length, byte *data)
 	if (chan->message.overFlowed || chan->message.curSize >= MAX_CL_MSGLEN) {
 		chan->fatalError = qTrue;
 		Com_Printf (PRNT_WARNING, "%s: Outgoing message overflow\n", NET_AdrToString (&chan->remoteAddress));
+		Com_DevPrintf (0, "Netchan overflow: clearing message\n");
+		MSG_Clear (&chan->message);
+		chan->reliableLength = 0;
+		chan->fatalError = qFalse;
 		return -2;
 	}
 

@@ -73,6 +73,11 @@ SERVER_OBJ = $(SERVER_SRC:.c=.o)
 UNIX_CLIENT_OBJ = $(UNIX_CLIENT_SRC:.c=.o)
 UNIX_DED_OBJ = $(UNIX_DED_SRC:.c=.o)
 
+# Dedicated-only object lists (compiled with DED_CFLAGS)
+DED_COMMON_OBJ = $(COMMON_SRC:.c=.ded.o)
+DED_SERVER_OBJ = $(SERVER_SRC:.c=.ded.o)
+DED_UNIX_DED_OBJ = $(UNIX_DED_SRC:.c=.ded.o)
+
 # Output names (Unix module loader expects game.so / eglcgame.so on non-i386)
 CGAME_SO = eglcgame.so
 GAME_SO = game.so
@@ -88,7 +93,7 @@ egl: $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ) $(UNIX_CLIENT_OBJ) $(COMMON_OBJ
 
 dedicated: eglded
 
-eglded: $(COMMON_OBJ) $(SERVER_OBJ) $(UNIX_DED_OBJ)
+eglded: $(DED_COMMON_OBJ) $(DED_SERVER_OBJ) $(DED_UNIX_DED_OBJ)
 	$(CC) -o $@ $^ $(DED_LDFLAGS)
 
 modules: $(CGAME_SO) $(GAME_SO)
@@ -105,6 +110,9 @@ $(GAME_SO): $(GAME_OBJ:.o=.pic.o) $(SHARED_SRC:.c=.pic.o)
 # Pattern rules
 %.o: %.c
 	$(CC) $(CFLAGS_COMMON) -c $< -o $@
+
+%.ded.o: %.c
+	$(CC) $(DED_CFLAGS) -c $< -o $@
 
 %.pic.o: %.c
 	$(CC) $(SO_CFLAGS) -c $< -o $@

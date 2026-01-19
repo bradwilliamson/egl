@@ -170,6 +170,23 @@ typedef struct downloadStatic_s {
 #endif
 } downloadStatic_t;
 
+// Challenge extras parsed from server's challenge response (q2repro-style)
+typedef struct clChallengeExtras_s {
+	qBool				valid;						// true if we have parsed a challenge
+
+	// Protocol advertisement
+	qBool				sawProtocolList;			// server sent p=...
+	qBool				sawOriginal;				// server supports protocol 34
+	qBool				sawEnhanced;				// server supports protocol 35 (R1Q2)
+	qBool				sawProto26;					// server supports protocol 26
+
+	// Selected protocol for this connection attempt
+	int					selectedProtocol;
+
+	// Other extras (for future expansion)
+	char				dlserver[256];				// HTTP download server if advertised
+} clChallengeExtras_t;
+
 typedef struct clientStatic_s {
 	int					connectCount;
 	float				connectTime;				// for connection retransmits
@@ -203,6 +220,7 @@ typedef struct clientStatic_s {
 	int					quakePort;					// a 16 bit value that allows quake servers
 													// to work around address translating routers
 	int					challenge;					// from the server to use for connecting
+	clChallengeExtras_t	challengeExtras;			// parsed challenge extras (q2repro-style)
 	qBool				forcePacket;				// forces a packet to be sent the next frame
 
 	downloadStatic_t	download;

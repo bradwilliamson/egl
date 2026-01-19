@@ -53,15 +53,23 @@ UI_Init
 */
 void UI_Init (void)
 {
+	Com_DevPrintf (0, "[cginit] UI_Init begin\n");
+	
 	// Register cvars
 	ui_filtermouse		= cgi.Cvar_Register ("ui_filtermouse",	"1",		CVAR_ARCHIVE);
 	ui_sensitivity		= cgi.Cvar_Register ("ui_sensitivity",	"2",		CVAR_ARCHIVE);
+	Com_DevPrintf (0, "[cginit] UI_Init cvars registered\n");
 
 	// Cursor init
+	Com_DevPrintf (0, "[cginit] before UI_CursorInit\n");
 	UI_CursorInit ();
+	Com_DevPrintf (0, "[cginit] after UI_CursorInit\n");
 
 	// Menu init
+	Com_DevPrintf (0, "[cginit] before M_Init\n");
 	M_Init ();
+	Com_DevPrintf (0, "[cginit] after M_Init\n");
+	Com_DevPrintf (0, "[cginit] UI_Init done\n");
 }
 
 

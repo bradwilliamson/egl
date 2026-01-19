@@ -12,8 +12,25 @@ TODO: flesh out full mode enumeration/setting, input hookup, and gamma control.
 #if defined(__unix__)
 #include "../unix/unix_glimp.h"
 #endif
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
+#define SDL_MAIN_HANDLED 1
+#if defined(__has_include)
+#  if __has_include(<SDL2/SDL.h>)
+#    include <SDL2/SDL.h>
+#  else
+#    include <SDL2/SDL.h>
+#  endif
+#else
+#  include <SDL2/SDL.h>
+#endif
+#if defined(__has_include)
+#  if __has_include(<SDL2/SDL_opengl.h>)
+#    include <SDL2/SDL_opengl.h>
+#  else
+#    include <SDL2/SDL_opengl.h>
+#  endif
+#else
+#  include <SDL2/SDL_opengl.h>
+#endif
 #include <limits.h>
 
 #ifndef APPLICATION
@@ -232,10 +249,9 @@ static void VID_UpdateWindowPosAndSize (void)
 
 void VID_CheckChanges (refConfig_t *outConfig)
 {
-    if (!sdl_window)
-        return;
-
-    if (vid_xpos && vid_xpos->modified || vid_ypos && vid_ypos->modified) {
+    // Don't early-out if the window isn't created yet; the initial startup
+    // path relies on this function to run R_Init() which will create it.
+    if (sdl_window && ((vid_xpos && vid_xpos->modified) || (vid_ypos && vid_ypos->modified))) {
         VID_UpdateWindowPosAndSize ();
     }
 
