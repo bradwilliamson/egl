@@ -100,6 +100,7 @@ qBool CL_ForwardCmdToServer (void)
 	char	*cmd;
 
 	cmd = Cmd_Argv (0);
+
 	if (Com_ClientState () <= CA_CONNECTED || *cmd == '-' || *cmd == '+')
 		return qFalse;
 
@@ -127,6 +128,8 @@ static void CL_SendConnectPacket (int useProtocol)
 	netAdr_t	adr;
 	int			port;
 	uint32		msgLen;
+	char		userInfoStr[MAX_INFO_STRING];
+	char		verStr[16];
 
 	if (!NET_StringToAdr (cls.serverName, &adr)) {
 		Com_Printf (PRNT_WARNING, "Bad server address\n");
@@ -164,11 +167,13 @@ static void CL_SendConnectPacket (int useProtocol)
 			}
 		}
 
-		// Enhanced protocol port is a byte
-		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+		// Enhanced protocols (R1Q2/Q2Pro) use byte qport
+		if (cls.serverProtocol >= ENHANCED_PROTOCOL_VERSION) {
 			port &= 0xff;
 
 			msgLen = Cvar_GetIntegerValue ("net_maxMsgLen");
+			if (msgLen < MAX_SV_USABLEMSG)
+				msgLen = MAX_SV_USABLEMSG;  // Ensure minimum sensible value
 			if (msgLen > MAX_CL_USABLEMSG)
 				msgLen = MAX_CL_USABLEMSG;
 		}
@@ -179,14 +184,188 @@ static void CL_SendConnectPacket (int useProtocol)
 
 	cls.quakePort = port;
 
-	// Send
+	// Build userinfo and ensure version keys are present for servers that
+	// enforce a minimum Quake II patch level (typically 3.19+).
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		// Reconstruct userinfo manually for Q2Pro to avoid potential garbage from Cvar_BitInfo
+		// or unsupported keys that might trigger strict validation issues.
+		char skinStr[MAX_INFO_VALUE];
+		int i;
+		const char *v;
+
+		userInfoStr[0] = 0;
+		Info_SetValueForKey(userInfoStr, "name", Cvar_GetStringValue("name"));
+		
+		// Normalize legacy skin format for Q2Pro: "male/grunt" -> "male_grunt"
+		Q_strncpyz (skinStr, Cvar_GetStringValue("skin"), sizeof (skinStr));
+		for (i = 0; skinStr[i]; i++) {
+			if (skinStr[i] == '/')
+				skinStr[i] = '_';
+		}
+		Info_SetValueForKey(userInfoStr, "skin", skinStr);
+		
+		// ONLY add fields with non-zero/non-empty values for Q2Pro
+		if ((v = Cvar_GetStringValue("rate"))[0] && atoi(v) > 0)
+			Info_SetValueForKey(userInfoStr, "rate", v);
+		else
+			Info_SetValueForKey(userInfoStr, "rate", "8000");
+			
+		if ((v = Cvar_GetStringValue("msg"))[0] && atoi(v) > 0)
+			Info_SetValueForKey(userInfoStr, "msg", v);
+		else
+			Info_SetValueForKey(userInfoStr, "msg", "64");
+			
+		if ((v = Cvar_GetStringValue("fov"))[0] && atoi(v) > 0)
+			Info_SetValueForKey(userInfoStr, "fov", v);
+		
+		if ((v = Cvar_GetStringValue("hand"))[0] && strcmp(v, "0") != 0)
+			Info_SetValueForKey(userInfoStr, "hand", v);
+		else
+			Info_SetValueForKey(userInfoStr, "hand", "right");
+			
+		Info_SetValueForKey(userInfoStr, "gender", Cvar_GetStringValue("gender"));
+		Info_SetValueForKey(userInfoStr, "spectator", Cvar_GetStringValue("spectator"));
+	} else {
+		Q_strncpyz (userInfoStr, Cvar_BitInfo (CVAR_USERINFO), sizeof (userInfoStr));
+	}
+	
+	// Q2Pro strict validation: remove ALL fields with "0" value BEFORE forcing version
+	// Q2Pro's Info_Validate rejects any field with value "0" as malformed
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		char cleanInfo[MAX_INFO_STRING];
+		char tempKey[MAX_INFO_KEY];
+		char tempValue[MAX_INFO_VALUE];
+		const char *p;
+		int len;
+
+		cleanInfo[0] = 0;
+
+		// Parse through userinfo: format is \key\value\key\value...
+		p = userInfoStr;
+		while (*p == '\\') {
+			p++;  // skip leading backslash
+			
+			// Extract key
+			len = 0;
+			while (p[len] && p[len] != '\\' && len < (int)sizeof(tempKey) - 1) {
+				tempKey[len] = p[len];
+				len++;
+			}
+			tempKey[len] = 0;
+			p += len;
+
+			if (*p != '\\') break;  // malformed
+			p++;  // skip backslash before value
+
+			// Extract value
+			len = 0;
+			while (p[len] && p[len] != '\\' && len < (int)sizeof(tempValue) - 1) {
+				tempValue[len] = p[len];
+				len++;
+			}
+			tempValue[len] = 0;
+			p += len;
+
+			// Only add if value is not "0"
+			if (strcmp(tempValue, "0") != 0) {
+				Info_SetValueForKey(cleanInfo, tempKey, tempValue);
+			}
+		}
+
+		Q_strncpyz(userInfoStr, cleanInfo, sizeof(userInfoStr));
+	}
+	
+	CL_ForceUserinfoVersion (userInfoStr);
+
+	// Sanitize userinfo string to prevent "Malformed userinfo string" server error
+	// For Q2Pro/enhanced protocols, the format is already strict and validated.
+	// Only sanitize for older protocols.
+	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION) {
+		int i;
+		for (i = 0; userInfoStr[i]; i++) {
+			if (userInfoStr[i] < 32 || userInfoStr[i] > 126) {
+				userInfoStr[i] = '.';
+			}
+			if (userInfoStr[i] == '\"' || userInfoStr[i] == ';') {
+				userInfoStr[i] = '.';
+			}
+		}
+	}
+
+	// Debug output
 	Com_DevPrintf (0, "CL_SendConnectPacket: protocol=%d, port=%d, challenge=%u\n", cls.serverProtocol, port, cls.challenge);
-	if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
-		Netchan_OutOfBandPrint (NS_CLIENT, &adr, "connect %i %i %i \"%s\" %u\n",
-			cls.serverProtocol, port, cls.challenge, Cvar_BitInfo (CVAR_USERINFO), msgLen);
-	else
-		Netchan_OutOfBandPrint (NS_CLIENT, &adr, "connect %i %i %i \"%s\"\n",
-			cls.serverProtocol, port, cls.challenge, Cvar_BitInfo (CVAR_USERINFO));
+
+	Q_strncpyz (verStr, Info_ValueForKey (userInfoStr, "ver"), sizeof (verStr));
+	Com_Printf (0, "CL_SendConnectPacket: sending protocol=%d ver=\"%s\" version=\"%s\" userinfo len=%zu\n",
+		cls.serverProtocol,
+		verStr[0] ? verStr : "(none)",
+		Info_ValueForKey (userInfoStr, "version"),
+		strlen (userInfoStr));
+	Com_Printf (0, "Full UserInfo: [%s]\n", userInfoStr);
+
+	// Send
+	// Protocol 35 (R1Q2) and 36 (Q2Pro) use extended connect formats.
+	// Quote the userinfo argument so spaces in values (e.g. name) remain intact.
+	// Important: do NOT append a '\n' here. Some strict servers include it in the
+	// parsed userinfo and reject it as non-printable.
+	
+	if (cls.serverProtocol >= ENHANCED_PROTOCOL_VERSION) {
+		if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+			// Q2Pro 36: send msgLen + flags
+			Com_Printf (0, "CL_SendConnectPacket: Q2PRO format with msgLen=%u\n", msgLen);
+			Netchan_OutOfBandPrint (NS_CLIENT, &adr, "connect %i %i %i \"%s\" %u 0 0 0",
+				cls.serverProtocol, port, cls.challenge, userInfoStr, msgLen);
+		}
+		else {
+			// R1Q2 35: format is "connect proto port challenge userinfo msglen version"
+			// The version (arg 6) tells the server which usercmd format we use.
+			// ENHANCED_COMPATIBILITY_NUMBER (1905) >= MINOR_VERSION_R1Q2_UCMD_UPDATES (1904)
+			// so the server will expect the optimized usercmd format.
+			Com_Printf (0, "CL_SendConnectPacket: R1Q2 format with msgLen=%u version=%d\n", msgLen, ENHANCED_COMPATIBILITY_NUMBER);
+			Netchan_OutOfBandPrint (NS_CLIENT, &adr, "connect %i %i %i \"%s\" %u %d",
+				cls.serverProtocol, port, cls.challenge, userInfoStr, msgLen, ENHANCED_COMPATIBILITY_NUMBER);
+		}
+		// Save negotiated msgLen for use in Netchan_Setup
+		cls.negotiatedMsgLen = msgLen;
+	}
+	else {
+		Com_Printf (0, "CL_SendConnectPacket: original format (no msgLen)\n");
+		Netchan_OutOfBandPrint (NS_CLIENT, &adr, "connect %i %i %i \"%s\"",
+			cls.serverProtocol, port, cls.challenge, userInfoStr);
+	}
+}
+
+
+/*
+=======================
+CL_ForceUserinfoVersion
+
+Some modded servers enforce a minimum Quake II patch level and parse the
+userinfo "version" key using atof/sscanf.
+
+To maximize compatibility, keep both "ver" and "version" as a plain
+numeric string and avoid adding non-standard keys.
+=======================
+*/
+void CL_ForceUserinfoVersion (char *userinfoStr)
+{
+	if (!userinfoStr)
+		return;
+
+	// Only spoof client identifiers for Q2Pro protocol 36.
+	// Doing this for protocol 35 (R1Q2) can make servers assume Q2Pro-specific
+	// features and send messages our protocol-35 parser doesn't expect.
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		const char *forcedClientStr = "Q2PROCL";
+		const char *forcedVersionStr = "Q2PROCL";
+
+		Info_SetValueForKey (userinfoStr, "client", forcedClientStr);
+		Info_SetValueForKey (userinfoStr, "version", forcedVersionStr);
+
+		// Remove conflicting keys
+		Info_RemoveKey (userinfoStr, "ver");
+		Info_RemoveKey (userinfoStr, "customclient");
+	}
 }
 
 
@@ -390,7 +569,7 @@ static void CL_ClientConnect_CP (void)
 
 	Com_DevPrintf (0, "client_connect: new (protocol=%d)\n", cls.serverProtocol);
 
-	Netchan_Setup (NS_CLIENT, &cls.netChan, &cls.netFrom, cls.serverProtocol, cls.quakePort, 0);
+	Netchan_Setup (NS_CLIENT, &cls.netChan, &cls.netFrom, cls.serverProtocol, cls.quakePort, cls.negotiatedMsgLen);
 
 	// Use challenge extras for HTTP download server if available (q2repro approach)
 	// This uses the dlserver= parsed from the challenge rather than connect args
@@ -524,6 +703,8 @@ static void CL_ParseChallengeExtras (void)
 						ext->sawOriginal = qTrue;
 					else if (proto == ENHANCED_PROTOCOL_VERSION)
 						ext->sawEnhanced = qTrue;
+					else if (proto == Q2PRO_PROTOCOL_VERSION)
+						ext->sawQ2Pro = qTrue;
 					else if (proto == 26)
 						ext->sawProto26 = qTrue;
 					p = end;
@@ -539,7 +720,6 @@ static void CL_ParseChallengeExtras (void)
 				else if (*p)
 					p++;
 			}
-			continue;
 		}
 
 		// Parse HTTP download server: dlserver=url
@@ -568,20 +748,52 @@ static int CL_SelectProtocolFromExtras (void)
 	clChallengeExtras_t *ext = &cls.challengeExtras;
 	int protocol;
 
-	// If user forced a protocol, use it
+	// If user forced a protocol, prefer it.
+	// If the server advertises a protocol list and the forced protocol isn't in it,
+	// fall back to an advertised protocol instead of forcing a mismatch.
 	if (cl_protocol->intVal) {
-		Com_DevPrintf (0, "CL_SelectProtocolFromExtras: using forced cl_protocol %d\n", cl_protocol->intVal);
-		return cl_protocol->intVal;
+		const int forced = cl_protocol->intVal;
+		if (ext->sawProtocolList) {
+			qBool supported = qFalse;
+
+			if (forced == ORIGINAL_PROTOCOL_VERSION && ext->sawOriginal)
+				supported = qTrue;
+			else if (forced == ENHANCED_PROTOCOL_VERSION && ext->sawEnhanced)
+				supported = qTrue;
+			else if (forced == Q2PRO_PROTOCOL_VERSION && ext->sawQ2Pro)
+				supported = qTrue;
+			else if (forced == 26 && ext->sawProto26)
+				supported = qTrue;
+
+			if (supported) {
+				Com_DevPrintf (0, "CL_SelectProtocolFromExtras: using forced cl_protocol %d (advertised)\n", forced);
+				return forced;
+			}
+
+			Com_Printf (PRNT_WARNING,
+				"WARNING: Server challenge did not advertise cl_protocol %d (p-list: orig=%d enh=%d p36=%d p26=%d). Falling back to advertised protocol.\n",
+				forced,
+				ext->sawOriginal ? 1 : 0,
+				ext->sawEnhanced ? 1 : 0,
+				ext->sawQ2Pro ? 1 : 0,
+				ext->sawProto26 ? 1 : 0);
+			// Continue below to advertised selection.
+		}
+		else {
+			Com_DevPrintf (0, "CL_SelectProtocolFromExtras: using forced cl_protocol %d (no p-list advertised)\n", forced);
+			return forced;
+		}
 	}
 
 	// If the server advertises supported protocols, pick one deterministically.
-	// We prefer original (34) when multiple options are present - this matches
-	// observed behavior with modern servers that advertise both but work better with 34.
+	// Prefer the most feature-complete protocol we understand.
 	if (ext->sawProtocolList) {
-		if (ext->sawOriginal)
-			protocol = ORIGINAL_PROTOCOL_VERSION;
+		if (ext->sawQ2Pro)
+			protocol = Q2PRO_PROTOCOL_VERSION;
 		else if (ext->sawEnhanced)
 			protocol = ENHANCED_PROTOCOL_VERSION;
+		else if (ext->sawOriginal)
+			protocol = ORIGINAL_PROTOCOL_VERSION;
 		else if (ext->sawProto26)
 			protocol = 26;
 		else
@@ -614,7 +826,7 @@ static void CL_Challenge_CP (void)
 
 	// Store challenge number
 	cls.challenge = atoi (Cmd_Argv (1));
-	Com_DevPrintf (0, "client: received challenge %u\n", cls.challenge);
+	Com_Printf (0, "CL_Challenge_CP: challenge=%u\n", cls.challenge);
 
 	// Parse all challenge extras into cls.challengeExtras
 	CL_ParseChallengeExtras ();
@@ -622,17 +834,31 @@ static void CL_Challenge_CP (void)
 	// Select protocol based on parsed extras
 	protocol = CL_SelectProtocolFromExtras ();
 	ext->selectedProtocol = protocol;
+	Com_Printf (0, "CL_Challenge_CP: selected protocol=%d\n", protocol);
 
 	// Log the decision
-	Com_DevPrintf (0, "client: challenge extras: valid=%d sawProtoList=%d orig=%d enh=%d p26=%d dlserver='%s'; selected=%d; cl_protocol=%d\n",
+	Com_DevPrintf (0, "client: challenge extras: valid=%d sawProtoList=%d orig=%d enh=%d p36=%d p26=%d dlserver='%s'; selected=%d; cl_protocol=%d\n",
 		ext->valid ? 1 : 0,
 		ext->sawProtocolList ? 1 : 0,
 		ext->sawOriginal ? 1 : 0,
 		ext->sawEnhanced ? 1 : 0,
+		ext->sawQ2Pro ? 1 : 0,
 		ext->sawProto26 ? 1 : 0,
 		ext->dlserver,
 		ext->selectedProtocol,
 		cl_protocol->intVal);
+
+	// If this was a query-only request, do not send a connect packet.
+	if (cls.challengeQueryPending) {
+		cls.challengeQueryPending = qFalse;
+		Com_Printf (0, "challengequery: done (selected=%d; advertised: orig=%d enh=%d p36=%d p26=%d)\n",
+			protocol,
+			ext->sawOriginal ? 1 : 0,
+			ext->sawEnhanced ? 1 : 0,
+			ext->sawQ2Pro ? 1 : 0,
+			ext->sawProto26 ? 1 : 0);
+		return;
+	}
 
 	// Reset timer to avoid duplicates, and send the connect packet
 	cls.connectTime = cls.realTime;
@@ -673,11 +899,32 @@ static void CL_ConnectionlessPacket (void)
 	Cmd_TokenizeString (cmd, qFalse);
 
 	cmd = Cmd_Argv (0);
+	
+	// Debug: show all incoming connectionless packets
+	Com_Printf (0, "CL_ConnectionlessPacket: received '%s' from %s\n", cmd, NET_AdrToString (&cls.netFrom));
 
+	// Diagnostic: during a query-only getchallenge (challengequery), always accept
+	// the challenge reply so we can see advertised protocol extras, even when not
+	// formally connected/allowed yet.
+	if (cls.challengeQueryPending && !strcmp (cmd, "challenge")) {
+		CL_Challenge_CP ();
+		return;
+	}
+
+	// Handle critical connection commands before address filtering
 	if (!strcmp (cmd, "client_connect")) {
 		Com_Printf (0, "%s: %s\n", NET_AdrToString (&cls.netFrom), cmd);
 		CL_ClientConnect_CP ();
 		return;
+	}
+	else if (!strcmp (cmd, "challenge")) {
+		// Handle challenge response early to avoid address filtering issues
+		// during the initial connection handshake
+		if (Com_ClientState () == CA_CONNECTING) {
+			Com_Printf (0, "%s: %s\n", NET_AdrToString (&cls.netFrom), cmd);
+			CL_Challenge_CP ();
+			return;
+		}
 	}
 	else if (!strcmp (cmd, "info")) {
 		CL_Info_CP ();
@@ -696,9 +943,16 @@ static void CL_ConnectionlessPacket (void)
 		isPrint = qFalse;
 	}
 
-	// Only allow the following from current connected server and last destination client sent an rcon to
+	// Only allow the following from current connected server and last destination client sent an rcon to.
+	// Also allow a one-off challenge response when a query-only getchallenge is in flight.
 	NET_StringToAdr (cls.serverName, &remote);
-	if (!NET_CompareBaseAdr (cls.netFrom, remote) && !NET_CompareBaseAdr (cls.netFrom, cl_lastRConTo)) {
+	Com_DevPrintf (0, "CL_ConnectionlessPacket: checking address - from=%s, serverName=%s, remote=%s\n",
+		NET_AdrToString (&cls.netFrom), cls.serverName, NET_AdrToString (&remote));
+	if (!(
+		(cls.challengeQueryPending && NET_CompareBaseAdr (cls.netFrom, cls.challengeQueryAdr))
+		|| NET_CompareBaseAdr (cls.netFrom, remote)
+		|| NET_CompareBaseAdr (cls.netFrom, cl_lastRConTo)
+	)) {
 		Com_Printf (PRNT_WARNING, "Illegal %s from %s. Ignored.\n", cmd, NET_AdrToString (&cls.netFrom));
 		return;
 	}
@@ -1202,6 +1456,7 @@ static void CL_Connect_f (void)
 
 	// Disconnect if connected
 	CL_Disconnect (qFalse);
+	cls.challengeQueryPending = qFalse;
 
 	// Reset the protocol attempt if we're connecting to a different server
 	if (!NET_CompareAdr (adr, cls.netChan.remoteAddress)) {
@@ -1360,6 +1615,48 @@ static void CL_PingServer_f (void)
 		adr.port = BigShort (PORT_SERVER);
 
 	Netchan_OutOfBandPrint (NS_CLIENT, &adr, Q_VarArgs ("info %i", ORIGINAL_PROTOCOL_VERSION));
+}
+
+
+/*
+================
+CL_ChallengeQuery_f
+
+Sends a getchallenge packet and prints the parsed challenge extras without attempting a full connect.
+Useful to confirm whether a server actually advertises protocol 35/36 support.
+================
+*/
+static void CL_ChallengeQuery_f (void)
+{
+	netAdr_t	adr;
+	char	*adrString;
+
+	if (Cmd_Argc () != 2) {
+		Com_Printf (0, "usage: challengequery <address>[:port]\n");
+		return;
+	}
+
+	NET_Config (NET_CLIENT);
+
+	adrString = Cmd_Argv (1);
+	if (!adrString || !adrString[0])
+		return;
+
+	if (!NET_StringToAdr (adrString, &adr)) {
+		Com_Printf (PRNT_WARNING, "Bad address: %s\n", adrString);
+		return;
+	}
+
+	if (!adr.port)
+		adr.port = BigShort (PORT_SERVER);
+
+	// Clear any previous parsed extras; mark a query-only request in flight.
+	memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
+	cls.challengeQueryPending = qTrue;
+	cls.challengeQueryAdr = adr;
+
+	Com_Printf (0, "challengequery: sending getchallenge to %s...\n", NET_AdrToString (&adr));
+	Netchan_OutOfBandPrint (NS_CLIENT, &adr, "getchallenge\n");
 }
 
 
@@ -1813,6 +2110,7 @@ static void CL_Register (void)
 	Cmd_AddCommand ("exit",				CL_Quit_f,				"Exits");
 	Cmd_AddCommand ("pause",			CL_Pause_f,				"Pauses the game");
 	Cmd_AddCommand ("pingserver",		CL_PingServer_f,		"Sends an info request packet to a server");
+	Cmd_AddCommand ("challengequery",	CL_ChallengeQuery_f,	"Sends getchallenge and prints advertised protocol extras");
 	Cmd_AddCommand ("pinglocal",		CL_PingLocal_f,			"Queries broadcast for an info string");
 	Cmd_AddCommand ("precache",			CL_Precache_f,			"");
 	Cmd_AddCommand ("quit",				CL_Quit_f,				"Exits");

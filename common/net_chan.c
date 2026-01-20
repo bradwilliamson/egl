@@ -158,7 +158,7 @@ void Netchan_Setup (netSrc_t sock, netChan_t *chan, netAdr_t *adr, int protocol,
 	chan->sock = sock;
 	chan->remoteAddress = *adr;
 
-	if (protocol == ENHANCED_PROTOCOL_VERSION) {
+	if (protocol == ENHANCED_PROTOCOL_VERSION || protocol == Q2PRO_PROTOCOL_VERSION) {
 		if (msgLen) {
 			if (msgLen > MAX_CL_USABLEMSG)
 				Com_Error (ERR_DROP, "Netchan_Setup: msgLen > MAX_CL_USABLEMSG (%i > %i)", msgLen, MAX_CL_USABLEMSG);
@@ -169,7 +169,8 @@ void Netchan_Setup (netSrc_t sock, netChan_t *chan, netAdr_t *adr, int protocol,
 			msgLen = MAX_SV_USABLEMSG;
 		}
 
-		qPort &= 0xff;
+		// Protocol 35 uses a byte qport on the wire. Protocol 36 handling is server-dependent,
+		// so we keep the full qPort value here and only truncate when serializing.
 	}
 	else {
 		MSG_Init (&chan->message, chan->messageBuff, MAX_SV_USABLEMSG);
@@ -245,7 +246,7 @@ int Netchan_Transmit (netChan_t *chan, size_t length, byte *data)
 	}
 
 	// Write the packet header
-	if (chan->protocol == ENHANCED_PROTOCOL_VERSION)
+	if (chan->protocol == ENHANCED_PROTOCOL_VERSION || chan->protocol == Q2PRO_PROTOCOL_VERSION)
 		MSG_Init (&send, sendBuf, MAX_CL_MSGLEN);
 	else
 		MSG_Init (&send, sendBuf, MAX_SV_MSGLEN);
@@ -259,11 +260,11 @@ int Netchan_Transmit (netChan_t *chan, size_t length, byte *data)
 	MSG_WriteLong (&send, w1);
 	MSG_WriteLong (&send, w2);
 
-	// Send the qport if we are a client
+	// Send the qport if we are a client (byte for enhanced protocols)
 	if (chan->sock == NS_CLIENT) {
-		if (chan->protocol != ENHANCED_PROTOCOL_VERSION)
+		if (chan->protocol == ORIGINAL_PROTOCOL_VERSION)
 			MSG_WriteShort (&send, chan->qPort);
-		else if (chan->qPort)
+		else
 			MSG_WriteByte (&send, chan->qPort & 0xff);
 	}
 

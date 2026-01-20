@@ -178,6 +178,7 @@ typedef struct clChallengeExtras_s {
 	qBool				sawProtocolList;			// server sent p=...
 	qBool				sawOriginal;				// server supports protocol 34
 	qBool				sawEnhanced;				// server supports protocol 35 (R1Q2)
+	qBool				sawQ2Pro;					// server supports protocol 36 (Q2Pro)
 	qBool				sawProto26;					// server supports protocol 26
 
 	// Selected protocol for this connection attempt
@@ -211,6 +212,7 @@ typedef struct clientStatic_s {
 	char				serverNameLast[MAX_OSPATH];
 	int					serverProtocol;				// in case we are doing some kind of version hack
 	int					protocolMinorVersion;
+	uint32				negotiatedMsgLen;			// negotiated message length for enhanced protocols
 
 	netAdr_t			netFrom;
 	netMsg_t			netMessage;
@@ -221,6 +223,8 @@ typedef struct clientStatic_s {
 													// to work around address translating routers
 	int					challenge;					// from the server to use for connecting
 	clChallengeExtras_t	challengeExtras;			// parsed challenge extras (q2repro-style)
+	qBool				challengeQueryPending;		// true if we're waiting for a challenge reply for a query-only request
+	netAdr_t			challengeQueryAdr;			// server address for the outstanding query-only request
 	qBool				forcePacket;				// forces a packet to be sent the next frame
 
 	downloadStatic_t	download;
@@ -459,6 +463,10 @@ void		CL_ClearState (void);
 void		CL_Disconnect (qBool openMenu);
 
 void		CL_Frame (int msec);
+
+// Ensures userinfo contains version keys that satisfy servers enforcing
+// a minimum Quake II patch level (typically 3.19+).
+void			CL_ForceUserinfoVersion (char *userinfoStr);
 
 void		CL_ClientInit (void);
 void		CL_ClientShutdown (qBool error);

@@ -247,11 +247,27 @@ typedef enum {qFalse, qTrue}	qBool;
 #define ORIGINAL_PROTOCOL_VERSION		34
 
 #define ENHANCED_PROTOCOL_VERSION		35
+#define Q2PRO_PROTOCOL_VERSION			36
 #define ENHANCED_COMPATIBILITY_NUMBER	1905
 
 #define MINOR_VERSION_R1Q2_BASE			1903
 #define MINOR_VERSION_R1Q2_UCMD_UPDATES	1904
 #define	MINOR_VERSION_R1Q2_32BIT_SOLID	1905
+
+// Q2Pro (protocol 36) minor versions (see q2pro protocol.h)
+#define MINOR_VERSION_Q2PRO_MINIMUM		1015
+#define MINOR_VERSION_Q2PRO_SERVER_STATE	1019
+#define MINOR_VERSION_Q2PRO_ZLIB_DOWNLOADS	1021
+#define MINOR_VERSION_Q2PRO_EXTENDED_LIMITS	1024
+#define MINOR_VERSION_Q2PRO_EXTENDED_LIMITS_2	1025
+#define MINOR_VERSION_Q2PRO_CURRENT		1026
+
+// Q2Pro protocol flags (protocol-36 serverdata tail, minor >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS)
+#define Q2PRO_PF_STRAFEJUMP_HACK	(1<<0)
+#define Q2PRO_PF_QW_MODE		(1<<1)
+#define Q2PRO_PF_WATERJUMP_HACK		(1<<2)
+#define Q2PRO_PF_EXTENSIONS		(1<<3)
+#define Q2PRO_PF_EXTENSIONS_2		(1<<4)
 
 //
 // server to client
@@ -290,6 +306,13 @@ enum svcTypes {
 
 	SVC_ZPACKET,				// new for ENHANCED_PROTOCOL_VERSION
 	SVC_ZDOWNLOAD,				// new for ENHANCED_PROTOCOL_VERSION
+	SVC_PLAYERUPDATE,			// new for ENHANCED_PROTOCOL_VERSION (R1Q2 only, cmd 23)
+	SVC_SETTING,				// new for ENHANCED_PROTOCOL_VERSION (R1Q2 cmd 24, Q2Pro cmd 25)
+
+	// Q2Pro protocol 36 extensions (note: SVC_GAMESTATE conflicts with R1Q2's SVC_PLAYERUPDATE at cmd 23)
+	SVC_GAMESTATE,				// new for Q2PRO_PROTOCOL_VERSION
+	SVC_CONFIGSTRINGSTREAM,	// new for Q2PRO_PROTOCOL_VERSION
+	SVC_BASELINESTREAM,		// new for Q2PRO_PROTOCOL_VERSION
 
 	SVC_MAX
 };
@@ -710,7 +733,7 @@ char	*Q_VarArgs (char *format, ...);
 void	Info_Print (char *s);
 char	*Info_ValueForKey (char *s, char *key);
 void	Info_RemoveKey (char *s, char *key);
-void	Info_SetValueForKey (char *s, char *key, char *value);
+void	Info_SetValueForKey (char *s, const char *key, const char *value);
 qBool	Info_Validate (char *s);
 
 /*

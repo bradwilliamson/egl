@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "cl_local.h"
 
+static int CL_ParseEntityBits (uint32 *bits);
+static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, int bits);
+
 char *cl_svcStrings[256] = {
 	"SVC_BAD",
 
@@ -50,8 +53,64 @@ char *cl_svcStrings[256] = {
 	"SVC_FRAME",
 
 	"SVC_ZPACKET",			// new for ENHANCED_PROTOCOL_VERSION
-	"SVC_ZDOWNLOAD"			// new for ENHANCED_PROTOCOL_VERSION
+	"SVC_ZDOWNLOAD",			// new for ENHANCED_PROTOCOL_VERSION
+
+	// Q2Pro protocol 36 extensions
+	"SVC_GAMESTATE",			// new for Q2PRO_PROTOCOL_VERSION
+	"SVC_SETTING",				// new for Q2PRO_PROTOCOL_VERSION
+	"SVC_CONFIGSTRINGSTREAM",	// new for Q2PRO_PROTOCOL_VERSION
+	"SVC_BASELINESTREAM"		// new for Q2PRO_PROTOCOL_VERSION
 };
+
+static void CL_ParseSetting (void)
+{
+	int index;
+	int value;
+
+	// Q2Pro: [long] index [long] value
+	index = MSG_ReadLong (&cls.netMessage);
+	value = MSG_ReadLong (&cls.netMessage);
+
+	// We don't currently implement any server-controlled settings.
+	// Consume and ignore.
+	(void)index;
+	(void)value;
+}
+
+static void CL_ParseGamestate (int cmd)
+{
+	int index;
+	uint32 bits;
+	entityState_t nullState;
+
+	memset (&nullState, 0, sizeof (nullState));
+
+	if (cmd == SVC_GAMESTATE || cmd == SVC_CONFIGSTRINGSTREAM) {
+		for ( ; ; ) {
+			index = MSG_ReadShort (&cls.netMessage);
+			if (index == MAX_CFGSTRINGS)
+				break;
+			if (index < 0 || index >= MAX_CFGSTRINGS)
+				Com_Error (ERR_DROP, "CL_ParseGamestate: bad configstring index %d", index);
+			{
+				char *str = MSG_ReadString (&cls.netMessage);
+				strcpy (cl.configStrings[index], str);
+				CL_CGModule_ParseConfigString (index, str);
+			}
+		}
+	}
+
+	if (cmd == SVC_GAMESTATE || cmd == SVC_BASELINESTREAM) {
+		for ( ; ; ) {
+			index = CL_ParseEntityBits (&bits);
+			if (!index)
+				break;
+			if (index < 0 || index >= MAX_CS_EDICTS)
+				Com_Error (ERR_DROP, "CL_ParseGamestate: bad baseline index %d", index);
+			CL_ParseDelta (&nullState, &cl_baseLines[index], index, bits);
+		}
+	}
+}
 
 /*
 =================
@@ -63,7 +122,7 @@ static void CL_ShowSVCString (char *message)
 	if (cl_shownet->intVal < 2)
 		return;
 
-	Com_Printf (0, "%3i:%s\n", cls.netMessage.readCount-1, message);
+	Com_Printf (0, "%3i/%i:%s\n", cls.netMessage.readCount-1, cls.netMessage.curSize, message);
 }
 
 
@@ -115,7 +174,7 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 	// Set everything to the state we are delta'ing from
 	*to = *from;
 
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION)
+	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION)
 		Vec3Copy (from->origin, to->oldOrigin);
 	else if (!(bits & U_OLDORIGIN) && !(from->renderFx & RF_BEAM))
 		Vec3Copy (from->origin, to->oldOrigin);
@@ -184,14 +243,29 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 
 	if (bits & U_SOLID)
 	{
-		if (cls.protocolMinorVersion >= MINOR_VERSION_R1Q2_32BIT_SOLID)
+		// Q2Pro (36) always sends long.
+		// R1Q2 (35) sends long if minor version >= MINOR_VERSION_R1Q2_32BIT_SOLID (1905).
+		// Original protocol (34) and older R1Q2 send short.
+		if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION)
+			to->solid = MSG_ReadLong (&cls.netMessage);
+		else if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION && cls.protocolMinorVersion >= MINOR_VERSION_R1Q2_32BIT_SOLID)
 			to->solid = MSG_ReadLong (&cls.netMessage);
 		else
 			to->solid = MSG_ReadShort (&cls.netMessage);
 	}
 
-	if (bits & U_VELOCITY && cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
-		MSG_ReadPos (&cls.netMessage, to->velocity);
+	if (bits & U_VELOCITY)
+	{
+		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
+		{
+			// R1Q2 35: Skip velocity - it's not used in deltas
+		}
+		else if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION)
+		{
+			// Q2PRO 36: Read velocity
+			MSG_ReadPos (&cls.netMessage, to->velocity);
+		}
+	}
 }
 
 /*
@@ -214,7 +288,7 @@ static void CL_ParsePlayerstate (const frame_t *oldFrame, frame_t *newFrame, int
 	int					flags;
 	qBool				enhanced;
 
-	enhanced = (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION);
+	enhanced = (cls.serverProtocol >= ENHANCED_PROTOCOL_VERSION);
 
 	state = &newFrame->playerState;
 
@@ -234,19 +308,21 @@ static void CL_ParsePlayerstate (const frame_t *oldFrame, frame_t *newFrame, int
 
 	// protocol changes
 	if (flags & PS_M_ORIGIN) {
-		if (!enhanced)
-			extraFlags |= EPS_PMOVE_ORIGIN2;
 		state->pMove.origin[0] = MSG_ReadShort (&cls.netMessage);
 		state->pMove.origin[1] = MSG_ReadShort (&cls.netMessage);
+		if (!enhanced)
+			// Protocol 34: Read 3rd component as part of PS_M_ORIGIN
+			extraFlags |= EPS_PMOVE_ORIGIN2;
 	}
 	if (extraFlags & EPS_PMOVE_ORIGIN2)
 		state->pMove.origin[2] = MSG_ReadShort (&cls.netMessage);
 
 	if (flags & PS_M_VELOCITY) {
-		if (!enhanced)
-			extraFlags |= EPS_PMOVE_VELOCITY2;
 		state->pMove.velocity[0] = MSG_ReadShort (&cls.netMessage);
 		state->pMove.velocity[1] = MSG_ReadShort (&cls.netMessage);
+		if (!enhanced)
+			// Protocol 34: Read 3rd component as part of PS_M_VELOCITY
+			extraFlags |= EPS_PMOVE_VELOCITY2;
 	}
 	if (extraFlags & EPS_PMOVE_VELOCITY2)
 		state->pMove.velocity[2] = MSG_ReadShort (&cls.netMessage);
@@ -278,10 +354,11 @@ static void CL_ParsePlayerstate (const frame_t *oldFrame, frame_t *newFrame, int
 
 	// protocol changes
 	if (flags & PS_VIEWANGLES) {
-		if (!enhanced)
-			extraFlags |= EPS_VIEWANGLE2;
 		state->viewAngles[0] = MSG_ReadAngle16 (&cls.netMessage);
 		state->viewAngles[1] = MSG_ReadAngle16 (&cls.netMessage);
+		if (!enhanced)
+			// Protocol 34: Read 3rd component as part of PS_VIEWANGLES
+			extraFlags |= EPS_VIEWANGLE2;
 	}
 	if (extraFlags & EPS_VIEWANGLE2)
 		state->viewAngles[2] = MSG_ReadAngle16 (&cls.netMessage);
@@ -298,9 +375,10 @@ static void CL_ParsePlayerstate (const frame_t *oldFrame, frame_t *newFrame, int
 
 	// protocol changes
 	if (flags & PS_WEAPONFRAME) {
-		if (!enhanced)
-			extraFlags |= EPS_GUNOFFSET|EPS_GUNANGLES;
 		state->gunFrame = MSG_ReadByte (&cls.netMessage);
+		if (!enhanced)
+			// Protocol 34: Read gunOffset and gunAngles as part of PS_WEAPONFRAME
+			extraFlags |= EPS_GUNOFFSET|EPS_GUNANGLES;
 	}
 	if (extraFlags & EPS_GUNOFFSET) {
 		state->gunOffset[0] = MSG_ReadChar (&cls.netMessage) * 0.25f;
@@ -393,11 +471,9 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 
 	// Delta from the entities present in oldFrame
 	oldIndex = 0;
-	if (oldFrame) {
-		if (oldIndex < oldFrame->numEntities) {
-			oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
-			oldNum = oldState->number;
-		}
+	if (oldFrame && oldFrame->numEntities > 0) {
+		oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
+		oldNum = oldState->number;
 	}
 
 	for ( ; ; ) {
@@ -411,7 +487,7 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 		if (!newNum)
 			break;
 
-		while (oldNum < newNum) {
+		while (oldFrame && oldNum < newNum) {
 			// One or more entities from the old packet are unchanged
 			if (cl_shownet->intVal == 3)
 				Com_Printf (0, "   unchanged: %i\n", oldNum);
@@ -434,13 +510,15 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 			if (oldNum != newNum)
 				Com_DevPrintf (PRNT_WARNING, "U_REMOVE: oldNum != newNum\n");
 
-			oldIndex++;
+			if (oldFrame) {
+				oldIndex++;
 
-			if (oldIndex >= oldFrame->numEntities)
-				oldNum = 99999;
-			else {
-				oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
-				oldNum = oldState->number;
+				if (oldIndex >= oldFrame->numEntities)
+					oldNum = 99999;
+				else {
+					oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
+					oldNum = oldState->number;
+				}
 			}
 			continue;
 		}
@@ -451,13 +529,15 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 				Com_Printf (0, "   delta: %i\n", newNum);
 			CL_DeltaEntity (newFrame, newNum, oldState, bits);
 
-			oldIndex++;
+			if (oldFrame) {
+				oldIndex++;
 
-			if (oldIndex >= oldFrame->numEntities)
-				oldNum = 99999;
-			else {
-				oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
-				oldNum = oldState->number;
+				if (oldIndex >= oldFrame->numEntities)
+					oldNum = 99999;
+				else {
+					oldState = &cl_parseEntities[(oldFrame->parseEntities+oldIndex) & (MAX_PARSEENTITIES_MASK)];
+					oldNum = oldState->number;
+				}
 			}
 			continue;
 		}
@@ -473,7 +553,7 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 	}
 
 	// Any remaining entities in the old frame are copied over
-	while (oldNum != 99999) {
+	while (oldFrame && oldNum != 99999) {
 		// One or more entities from the old packet are unchanged
 		if (cl_shownet->intVal == 3)
 			Com_Printf (0, "   unchanged: %i\n", oldNum);
@@ -510,7 +590,7 @@ static void CL_ParseFrame (int extraBits)
 
 	// Protocol updates
 	serverFrame = MSG_ReadLong (&cls.netMessage);
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION) {
+	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION) {
 		cl.frame.serverFrame = serverFrame;
 		cl.frame.deltaFrame = MSG_ReadLong (&cls.netMessage);
 	}
@@ -545,7 +625,7 @@ static void CL_ParseFrame (int extraBits)
 		data = MSG_ReadByte (&cls.netMessage);
 
 		//r1: HACK to get extra 4 bits of otherwise unused data
-		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+		if (cls.serverProtocol >= ENHANCED_PROTOCOL_VERSION) {
 			cl.surpressCount = (data & 0x0F);
 			extraFlags |= (data & 0xF0) >> 4;
 		}
@@ -569,14 +649,17 @@ static void CL_ParseFrame (int extraBits)
 		if (!oldFrame->valid) {
 			// Should never happen
 			Com_Printf (PRNT_ERROR, "Delta from invalid frame (not supposed to happen!).\n");
+			oldFrame = NULL;  // Don't use invalid frame for delta
 		}
-		if (oldFrame->serverFrame != cl.frame.deltaFrame) {
+		else if (oldFrame->serverFrame != cl.frame.deltaFrame) {
 			// The frame that the server did the delta from
 			// is too old, so we can't reconstruct it properly
 			Com_DevPrintf (PRNT_WARNING, "Delta frame too old.\n");
+			oldFrame = NULL;  // Don't use stale frame for delta
 		}
 		else if (cl.parseEntities-oldFrame->parseEntities > MAX_PARSE_ENTITIES-128) {
 			Com_DevPrintf (PRNT_WARNING, "Delta parseEntities too old.\n");
+			oldFrame = NULL;  // Don't use frame with stale entities
 		}
 		else
 			cl.frame.valid = qTrue;	// Valid delta parse
@@ -587,7 +670,7 @@ static void CL_ParseFrame (int extraBits)
 	MSG_ReadData (&cls.netMessage, &cl.frame.areaBits, len);
 
 	// Read playerinfo
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION) {
+	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION) {
 		cmd = MSG_ReadByte (&cls.netMessage);
 		CL_ShowSVCString (cl_svcStrings[cmd]);
 		if (cmd != SVC_PLAYERINFO)
@@ -596,7 +679,7 @@ static void CL_ParseFrame (int extraBits)
 	CL_ParsePlayerstate (oldFrame, &cl.frame, extraFlags);
 
 	// Read packet entities
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION) {
+	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION) {
 		cmd = MSG_ReadByte (&cls.netMessage);
 		CL_ShowSVCString (cl_svcStrings[cmd]);
 		if (cmd != SVC_PACKETENTITIES)
@@ -683,7 +766,7 @@ static qBool CL_ParseServerData (void)
 		Com_Error (ERR_DROP, "CL_ParseServerData: invalid attractLoop %d", cl.attractLoop);
 
 	// BIG HACK to let demos from release work with the 3.0x patch!!!
-	if (i != ORIGINAL_PROTOCOL_VERSION && i != ENHANCED_PROTOCOL_VERSION && i != 26 && !cl.attractLoop)
+	if (i != ORIGINAL_PROTOCOL_VERSION && i != ENHANCED_PROTOCOL_VERSION && i != Q2PRO_PROTOCOL_VERSION && i != 26 && !cl.attractLoop)
 		Com_Error (ERR_DROP, "Server is using unknown protocol %i.", i);
 
 	// Game directory
@@ -731,6 +814,31 @@ static qBool CL_ParseServerData (void)
 			cl.strafeHack = qFalse;
 
 		cls.protocolMinorVersion = newVersion;
+	}
+	else if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		// Authoritative Q2Pro layout (see q2pro SV_New_f):
+		// [short] minor
+		// [byte] server state (always present; meaning varies by minor)
+		// then either:
+		//   [short] protocol flags (minor >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS)
+		//   or [byte][byte][byte] legacy hacks: strafehack, qwmode, waterhack
+		cl.enhancedServer = 0;
+		newVersion = MSG_ReadShort (&cls.netMessage);
+		cls.protocolMinorVersion = newVersion;
+
+		// always present (but we only really care on newer minors)
+		(void)MSG_ReadByte (&cls.netMessage);
+
+		if (newVersion >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS) {
+			int flags = MSG_ReadShort (&cls.netMessage);
+			cl.strafeHack = (flags & Q2PRO_PF_STRAFEJUMP_HACK) ? qTrue : qFalse;
+			// We currently ignore other Q2Pro flags.
+		}
+		else {
+			cl.strafeHack = MSG_ReadByte (&cls.netMessage) ? qTrue : qFalse;
+			(void)MSG_ReadByte (&cls.netMessage);
+			(void)MSG_ReadByte (&cls.netMessage);
+		}
 	}
 	else {
 		cl.enhancedServer = 0;
@@ -909,8 +1017,8 @@ void CL_ParseZPacket (void)
 	compressedLen = MSG_ReadShort (&cls.netMessage);
 	uncompressedLen = MSG_ReadShort (&cls.netMessage);
 
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION)
-		Com_Error (ERR_DROP, "CL_ParseZPacket: SVC_ZPACKET -requires- ENHANCED_PROTOCOL_VERSION");
+	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION && cls.serverProtocol != Q2PRO_PROTOCOL_VERSION)
+		Com_Error (ERR_DROP, "CL_ParseZPacket: SVC_ZPACKET requires protocol 35 or 36");
 
 	if (uncompressedLen <= 0)
 		Com_Error (ERR_DROP, "CL_ParseZPacket: uncompressedLen <= 0");
@@ -997,10 +1105,23 @@ void CL_ParseServerMessage (void)
 			break;
 		}
 
-		//r1: more hacky bit stealing in the name of bandwidth
-		extraBits = cmd & 0xE0;
-		cmd &= 0x1F;
-		CL_ShowSVCString (cl_svcStrings[cmd]);
+		extraBits = 0;
+		// Both Q2Pro (36) and R1Q2 (35) use packed 5-bit svc opcode + 3 extra bits
+		// From R1Q2 source: "r1: more hacky bit stealing in the name of bandwidth"
+		if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+			// Q2Pro rule: extra bits are only valid for svc_frame (5-bit packed encoding)
+			if ((cmd & 0xE0) && ((cmd & 0x1F) != SVC_FRAME)) {
+				Com_Error (ERR_DROP, "CL_ParseServerMessage: Illegible server message (extra bits on cmd %d)", cmd & 0x1F);
+			}
+			extraBits = cmd & 0xE0;
+			cmd &= 0x1F;
+		}
+		else if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+			// R1Q2: Always unpacks all commands - extraBits only used for SVC_FRAME
+			extraBits = cmd & 0xE0;
+			cmd &= 0x1F;
+		}
+		CL_ShowSVCString (cl_svcStrings[cmd] ? cl_svcStrings[cmd] : "SVC_<unknown>");
 
 		//
 		// These are private to the client and server
@@ -1131,6 +1252,44 @@ void CL_ParseServerMessage (void)
 			CL_ParseDownload (qTrue);
 			break;
 
+		case SVC_PLAYERUPDATE:
+			// R1Q2-specific: svc_playerupdate (cmd 23) - player position updates
+			// This is NOT the same as Q2Pro's SVC_GAMESTATE which is also cmd 23
+			if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+				// R1Q2 player updates sent between frames for smoother player movement
+				// Format: framenum (long), then for each player that was in that frame: origin (3 shorts)
+				// 
+				// We need to figure out how many player positions follow. According to R1Q2:
+				// - The server iterates through all entities in the frame
+				// - For each entity where number <= maxclients, it writes position
+				// - The client must do the same iteration to know how many to read
+				//
+				// For now, since we don't properly track player update requests (CLSET_PLAYERUPDATE_REQUESTS),
+				// just skip this entire message by reading the framenum.
+				// If server sends player positions, they'll be misread and cause issues.
+				// But typically the server only sends these if client requests them.
+				MSG_ReadLong (&cls.netMessage); // framenum - discard
+				
+				// TODO: Properly implement player updates by tracking which entities
+				// in the referenced frame are players and reading their positions
+				Com_DevPrintf (0, "SVC_PLAYERUPDATE received but not fully implemented\n");
+			}
+			break;
+
+		case SVC_GAMESTATE:
+		case SVC_CONFIGSTRINGSTREAM:
+		case SVC_BASELINESTREAM:
+			if (cls.serverProtocol != Q2PRO_PROTOCOL_VERSION)
+				Com_Error (ERR_DROP, "CL_ParseServerMessage: Q2Pro gamestate stream requires protocol 36");
+			CL_ParseGamestate (cmd);
+			break;
+
+		case SVC_SETTING:
+			if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION)
+				Com_Error (ERR_DROP, "CL_ParseServerMessage: SVC_SETTING requires protocol 35+");
+			CL_ParseSetting ();
+			break;
+
 		default:
 			CL_WriteDemoMessageChunk (cls.netMessage.data + oldReadCount, cls.netMessage.readCount - oldReadCount, qFalse);
 			if (CL_CGModule_ParseServerMessage (cmd))
@@ -1138,11 +1297,11 @@ void CL_ParseServerMessage (void)
 
 			// Unknown to the client and CGame failed to parse it so...
 			{
-				const char *cmdStr = (cmd >= 0 && cmd < 256) ? cl_svcStrings[cmd] : "SVC_<invalid>";
+				const char *cmdStr = (cmd >= 0 && cmd < 256 && cl_svcStrings[cmd]) ? cl_svcStrings[cmd] : "SVC_<unknown>";
 				const char *lastStr;
 				if (lastCmd == -2)
 					lastStr = "None";
-				else if (lastCmd >= 0 && lastCmd < 256)
+				else if (lastCmd >= 0 && lastCmd < 256 && cl_svcStrings[lastCmd])
 					lastStr = cl_svcStrings[lastCmd];
 				else
 					lastStr = "SVC_<invalid>";
