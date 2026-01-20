@@ -200,7 +200,7 @@ qBool Info_Validate (char *s)
 Info_SetValueForKey
 ==================
 */
-void Info_SetValueForKey (char *s, char *key, char *value)
+void Info_SetValueForKey (char *s, const char *key, const char *value)
 {
 	char	newPair[MAX_INFO_STRING], *v;
 	int		c;

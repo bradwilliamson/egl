@@ -84,3 +84,16 @@ Thumbs.db
 # Local runtime-generated files
 /eglcfg.cfg
 /console.log
+
+# Protocol debugging / test captures
+*.pcapng
+
+# Test build output directories
+/out_runcheck*/
+
+# Downloaded archives / reference implementations
+*.zip
+anticheat.txt
+
+# Python analysis tools (local dev)
+/tools/analyze_packet.py

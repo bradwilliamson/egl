@@ -141,7 +141,9 @@ qBool CL_CheckOrDownloadFile (char *fileName)
 		Com_Printf (0, "Resuming %s\n", cls.download.name);
 
 		MSG_WriteByte (&cls.netChan.message, CLC_STRINGCMD);
-		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
+		// R1Q2 (35) always supports zlib, Q2Pro (36) supports zlib when minor >= 1021
+		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION ||
+			(cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && cls.protocolMinorVersion >= MINOR_VERSION_Q2PRO_ZLIB_DOWNLOADS))
 			MSG_WriteString (&cls.netChan.message, Q_VarArgs ("download \"%s\" %i udp-zlib", cls.download.name, len));
 		else
 			MSG_WriteString (&cls.netChan.message, Q_VarArgs ("download \"%s\" %i", cls.download.name, len));
@@ -150,7 +152,9 @@ qBool CL_CheckOrDownloadFile (char *fileName)
 		Com_Printf (0, "Downloading %s\n", cls.download.name);
 
 		MSG_WriteByte (&cls.netChan.message, CLC_STRINGCMD);
-		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
+		// R1Q2 (35) always supports zlib, Q2Pro (36) supports zlib when minor >= 1021
+		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION ||
+			(cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && cls.protocolMinorVersion >= MINOR_VERSION_Q2PRO_ZLIB_DOWNLOADS))
 			MSG_WriteString (&cls.netChan.message, Q_VarArgs ("download \"%s\" 0 udp-zlib", cls.download.name));
 		else
 			MSG_WriteString (&cls.netChan.message, Q_VarArgs ("download \"%s\"", cls.download.name));
@@ -172,10 +176,21 @@ void CL_ParseDownload (qBool compressed)
 {
 	int		size, percent;
 	char	name[MAX_OSPATH];
+	qBool	inbandZlib = qFalse;
 
 	// Read the data
 	size = MSG_ReadShort (&cls.netMessage);
 	percent = MSG_ReadByte (&cls.netMessage);
+
+	// R1Q2 (protocol 35) can send zlib-compressed download blocks using SVC_DOWNLOAD
+	// by encoding the compressed length as a negative size: size = -(compressedLen + 1).
+	// The payload format then matches SVC_ZDOWNLOAD: [short uncompressedLen] [compressed bytes].
+	if (!compressed && cls.serverProtocol == ENHANCED_PROTOCOL_VERSION && size < -1) {
+		inbandZlib = qTrue;
+		size = -size - 1;
+		compressed = qTrue;
+	}
+
 	if (size < 0) {
 		if (size == -1)
 			Com_Printf (PRNT_WARNING, "Server does not have this file.\n");
@@ -198,7 +213,12 @@ void CL_ParseDownload (qBool compressed)
 	// Open the file if not opened yet
 	if (!cls.download.file) {
 		if (!cls.download.tempName[0]) {
-			Com_Printf (PRNT_WARNING, "Received download packet without requesting it first, ignoring.\n");
+			Com_Printf (PRNT_WARNING, "Received download packet without requesting it first, ignoring (size=%d, percent=%d, compressed=%d).\n", size, percent, compressed);
+			// Skip payload bytes so we don't desync the server message parser.
+			if (compressed)
+				cls.netMessage.readCount += 2 + size; // [short uncompressedLen] + data
+			else
+				cls.netMessage.readCount += size;
 			return;
 		}
 
@@ -208,7 +228,11 @@ void CL_ParseDownload (qBool compressed)
 
 		cls.download.file = fopen (name, "wb");
 		if (!cls.download.file) {
-			cls.netMessage.readCount += size;
+			// Skip payload bytes so we don't desync the server message parser.
+			if (compressed)
+				cls.netMessage.readCount += 2 + size; // [short uncompressedLen] + data
+			else
+				cls.netMessage.readCount += size;
 			Com_Printf (PRNT_WARNING, "Failed to open %s\n", cls.download.tempName);
 			CL_RequestNextDownload ();
 			return;
@@ -217,6 +241,10 @@ void CL_ParseDownload (qBool compressed)
 
 	// Insert block
  	if (compressed) {
+		if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+			Com_Error (ERR_DROP, "CL_ParseDownload: Q2Pro compressed downloads (svc_zdownload) not supported yet");
+		}
+
  		uint16		uncompressedLen;
  		static byte	uncompressed[0xFFFF];
 
@@ -224,9 +252,9 @@ void CL_ParseDownload (qBool compressed)
  		if (!uncompressedLen)
 			Com_Error (ERR_DROP, "CL_ParseDownload: uncompressedLen == 0");
 
- 		FS_ZLibDecompress (cls.netMessage.data + cls.netMessage.readCount, size, uncompressed, uncompressedLen, -15);
+		FS_ZLibDecompress (cls.netMessage.data + cls.netMessage.readCount, size, uncompressed, uncompressedLen, -15);
  		fwrite (uncompressed, 1, uncompressedLen, cls.download.file);
- 		Com_DevPrintf (0, "SVC_ZDOWNLOAD(%s): %d -> %d\n", cls.download.name, size, uncompressedLen);
+		Com_DevPrintf (0, "%s(%s): %d -> %d\n", inbandZlib ? "SVC_DOWNLOAD_ZLIB" : "SVC_ZDOWNLOAD", cls.download.name, size, uncompressedLen);
  	}
  	else {
 		fwrite (cls.netMessage.data + cls.netMessage.readCount, 1, size, cls.download.file);

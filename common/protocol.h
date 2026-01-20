@@ -32,6 +32,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define UPDATE_BACKUP		16	// copies of entityState_t to keep buffered must be power of two
 #define UPDATE_MASK			(UPDATE_BACKUP-1)
 
+#define ORIGINAL_PROTOCOL_VERSION	34
+#define ENHANCED_PROTOCOL_VERSION	35
+#define Q2PRO_PROTOCOL_VERSION		36
+
 //
 // client to server
 //
