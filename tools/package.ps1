@@ -9,6 +9,158 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Get-ObjdumpPath {
+    param(
+        [string]$ToolchainBin
+    )
+
+    if (-not $ToolchainBin) { return $null }
+
+    $candidates = @(
+        (Join-Path $ToolchainBin 'objdump.exe'),
+        (Join-Path $ToolchainBin 'objdump')
+    )
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path -LiteralPath $c)) {
+            return $c
+        }
+    }
+
+    return $null
+}
+
+function Get-PeImportDllNames {
+    param(
+        [string]$Objdump,
+        [string]$BinaryPath
+    )
+
+    if (-not (Test-Path -LiteralPath $BinaryPath)) {
+        throw "Dependency check: missing binary '$BinaryPath'"
+    }
+
+    $lines = & $Objdump -p $BinaryPath 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $lines) {
+        throw "Dependency check: failed to read imports from '$BinaryPath'"
+    }
+
+    $names = @()
+    foreach ($m in ($lines | Select-String -Pattern '^\s*DLL Name:\s*' -AllMatches)) {
+        $name = ($m.Line -replace '^\s*DLL Name:\s*', '').Trim()
+        if ($name) { $names += $name }
+    }
+
+    $names | Sort-Object -Unique
+}
+
+function Test-IsSystemDll {
+    param(
+        [string]$Name
+    )
+
+    if (-not $Name) { return $true }
+    $n = $Name.ToLowerInvariant()
+
+    if ($n -like 'api-ms-win-*.dll') { return $true }
+    if ($n -like 'ext-ms-*.dll') { return $true }
+
+    $system = @(
+        'advapi32.dll',
+        'bcrypt.dll',
+        'cfgmgr32.dll',
+        'comctl32.dll',
+        'comdlg32.dll',
+        'crypt32.dll',
+        'gdi32.dll',
+        'hid.dll',
+        'imm32.dll',
+        'kernel32.dll',
+        'msvcrt.dll',
+        'ntdll.dll',
+        'ole32.dll',
+        'oleaut32.dll',
+        'opengl32.dll',
+        'rpcrt4.dll',
+        'secur32.dll',
+        'setupapi.dll',
+        'shell32.dll',
+        'shlwapi.dll',
+        'ucrtbase.dll',
+        'user32.dll',
+        'version.dll',
+        'winmm.dll',
+        'ws2_32.dll',
+        'wsock32.dll'
+    )
+
+    return $system -contains $n
+}
+
+function Test-StagedDependencies {
+    param(
+        [string]$Objdump,
+        [string]$OutRoot,
+        [string]$OutBase
+    )
+
+    $searchDirs = @($OutRoot, $OutBase) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    if (-not $searchDirs) {
+        throw 'Dependency check: output folders do not exist'
+    }
+
+    $roots = @(
+        (Join-Path $OutRoot 'egl.exe'),
+        (Join-Path $OutRoot 'eglded.exe'),
+        (Join-Path $OutBase 'gamex64.dll'),
+        (Join-Path $OutBase 'eglcgamex64.dll')
+    ) | Where-Object { Test-Path -LiteralPath $_ }
+
+    # Also include all staged DLLs next to egl.exe to catch transitive deps.
+    $roots += (Get-ChildItem -LiteralPath $OutRoot -File -Filter '*.dll' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+
+    $queue = New-Object System.Collections.Generic.Queue[string]
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+
+    foreach ($r in ($roots | Sort-Object -Unique)) {
+        $full = (Resolve-Path -LiteralPath $r).Path
+        if ($seen.Add($full)) { $queue.Enqueue($full) }
+    }
+
+    $missing = New-Object System.Collections.Generic.List[string]
+
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        $imports = Get-PeImportDllNames -Objdump $Objdump -BinaryPath $current
+
+        foreach ($imp in $imports) {
+            if (Test-IsSystemDll -Name $imp) { continue }
+
+            $foundPath = $null
+            foreach ($dir in $searchDirs) {
+                $candidate = Join-Path $dir $imp
+                if (Test-Path -LiteralPath $candidate) {
+                    $foundPath = (Resolve-Path -LiteralPath $candidate).Path
+                    break
+                }
+            }
+
+            if (-not $foundPath) {
+                $missing.Add("$imp (required by $(Split-Path -Leaf $current))")
+                continue
+            }
+
+            if ($seen.Add($foundPath)) {
+                $queue.Enqueue($foundPath)
+            }
+        }
+    }
+
+    if ($missing.Count -gt 0) {
+        $msg = "Portable build is missing required DLLs:\n- " + (($missing | Sort-Object -Unique) -join "\n- ")
+        throw $msg
+    }
+}
+
 function Find-Msys2Root {
     param(
         [string[]]$Candidates
@@ -91,6 +243,11 @@ if (-not ($env:PATH -split ';' | Where-Object { $_ -ieq $toolchainBin })) {
 
 if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
     throw "gcc is still not discoverable after updating PATH with '$toolchainBin'. Current PATH does not allow running the toolchain."
+}
+
+$objdump = Get-ObjdumpPath -ToolchainBin $toolchainBin
+if (-not $objdump) {
+    throw "Could not find objdump.exe under toolchain bin '$toolchainBin'. Ensure binutils is installed with your MSYS2 toolchain."
 }
 
 # If USE_SDL2=1 was requested, sanity-check that SDL2 headers exist under the detected MSYS2 root.
@@ -190,6 +347,9 @@ if (-not $NoPkzCopy) {
         Write-Warning "Did not find data\\egl.pkz; output will not be directly playable without it."
     }
 }
+
+# Fail fast if any staged binary/DLL depends on a non-system DLL that wasn't staged.
+Test-StagedDependencies -Objdump $objdump -OutRoot $outRoot -OutBase $outBase
 
 Write-Host "Packaged portable build to: $outRoot" -ForegroundColor Green
 Write-Host "Run: `"$outRoot\\egl.exe`"" -ForegroundColor Green
