@@ -687,6 +687,16 @@ static void CL_ParseFrame (int extraBits)
 	}
 	CL_ParsePacketEntities (oldFrame, &cl.frame);
 
+	// Q2Pro frames may have 0xFF padding bytes after the entity list
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		while (cls.netMessage.readCount < cls.netMessage.curSize) {
+			byte nextByte = cls.netMessage.data[cls.netMessage.readCount];
+			if (nextByte != 0xFF)
+				break;
+			MSG_ReadByte (&cls.netMessage); // skip padding byte
+		}
+	}
+
 	// Translate for demos
 	if (cls.demoRecording && cls.serverProtocol != ORIGINAL_PROTOCOL_VERSION) {
 		netMsg_t	fakeMsg;
@@ -722,6 +732,7 @@ static void CL_ParseFrame (int extraBits)
 
 	// Save the frame off in the backup array for later delta comparisons
 	cl.frames[cl.frame.serverFrame & UPDATE_MASK] = cl.frame;
+
 	if (cl.frame.valid) {
 		// Getting a valid frame message ends the connection process
 		if (Com_ClientState () != CA_ACTIVE)
@@ -759,6 +770,14 @@ static qBool CL_ParseServerData (void)
 	// Parse protocol version number
 	i = MSG_ReadLong (&cls.netMessage);
 	cls.serverProtocol = i;
+
+	// CRITICAL: Update the network channel protocol if the server reports a different
+	// protocol than what we requested. This affects qport size (2 bytes for protocol 34,
+	// 1 byte for enhanced protocols 35/36). If we don't update this, the server will
+	// misparse our packets.
+	if (cls.netChan.protocol != i) {
+		cls.netChan.protocol = i;
+	}
 
 	cl.serverCount = MSG_ReadLong (&cls.netMessage);
 	cl.attractLoop = MSG_ReadByte (&cls.netMessage);
@@ -1055,6 +1074,7 @@ CL_ParseServerMessage
 void CL_ParseServerMessage (void)
 {
 	int			cmd, i;
+	int			rawCmd;
 	char		*s, timestamp[10];
 	time_t		ctime;
 	struct tm	*ltime;
@@ -1099,12 +1119,17 @@ void CL_ParseServerMessage (void)
 		}
 
 		oldReadCount = cls.netMessage.readCount;
-		cmd = MSG_ReadByte (&cls.netMessage);
-		if (cmd == -1) {
+		rawCmd = MSG_ReadByte (&cls.netMessage);
+		if (rawCmd == -1) {
 			CL_ShowSVCString ("END OF MESSAGE");
 			break;
 		}
-
+		// Q2Pro uses 0xFF as an end-of-message sentinel in packed frames
+		if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && rawCmd == 0xFF) {
+			CL_ShowSVCString ("END OF MESSAGE (0xFF sentinel)");
+			break;
+		}
+		cmd = rawCmd;
 		extraBits = 0;
 		// Both Q2Pro (36) and R1Q2 (35) use packed 5-bit svc opcode + 3 extra bits
 		// From R1Q2 source: "r1: more hacky bit stealing in the name of bandwidth"
@@ -1122,6 +1147,13 @@ void CL_ParseServerMessage (void)
 			cmd &= 0x1F;
 		}
 		CL_ShowSVCString (cl_svcStrings[cmd] ? cl_svcStrings[cmd] : "SVC_<unknown>");
+
+		/* Q2Pro padding handling: some servers append a 0x00 padding byte after an
+		   SVC_FRAME; avoid treating this as a fatal SVC_BAD by stopping parse here */
+		if (cmd == SVC_BAD && cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && lastCmd == SVC_FRAME) {
+			CL_ShowSVCString ("SVC_BAD after frame treated as padding");
+			break;
+		}
 
 		//
 		// These are private to the client and server

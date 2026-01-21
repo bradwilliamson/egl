@@ -638,7 +638,8 @@ void CL_SendCmd (void)
 	MSG_WriteByte (&buf, CLC_MOVE);
 
 	// Save the position for a checksum byte
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION) {
+	// R1Q2 (35) and Q2Pro (36) both skip the checksum byte
+	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION && cls.serverProtocol != Q2PRO_PROTOCOL_VERSION) {
 		checkSumIndex = buf.curSize;
 		MSG_WriteByte (&buf, 0);
 	}
@@ -671,7 +672,8 @@ void CL_SendCmd (void)
 	MSG_WriteDeltaUsercmd (&buf, oldCmd, cmd, cls.protocolMinorVersion);
 
 	// Calculate a checksum over the move commands
-	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION) {
+	// R1Q2 (35) and Q2Pro (36) both skip the checksum byte
+	if (cls.serverProtocol != ENHANCED_PROTOCOL_VERSION && cls.serverProtocol != Q2PRO_PROTOCOL_VERSION) {
 		buf.data[checkSumIndex] = Com_BlockSequenceCRCByte (
 			buf.data + checkSumIndex + 1, buf.curSize - checkSumIndex - 1,
 			cls.netChan.outgoingSequence);

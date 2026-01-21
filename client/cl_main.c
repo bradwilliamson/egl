@@ -520,6 +520,7 @@ done:
 	cls.serverMessage[0] = '\0';
 	cls.serverName[0] = '\0';
 	cls.serverProtocol = 0;
+	cls.protocolMinorVersion = 0;
 	memset (&cls.challengeExtras, 0, sizeof (cls.challengeExtras));
 
 	Cvar_Set ("$mapname", "", qTrue);
@@ -567,9 +568,18 @@ static void CL_ClientConnect_CP (void)
 		return;
 	}
 
-	Com_DevPrintf (0, "client_connect: new (protocol=%d)\n", cls.serverProtocol);
-
-	Netchan_Setup (NS_CLIENT, &cls.netChan, &cls.netFrom, cls.serverProtocol, cls.quakePort, cls.negotiatedMsgLen);
+	// CRITICAL: If the server didn't advertise a protocol list in the challenge,
+	// it's likely a vanilla Q2 server. Even though we may have requested protocol 35,
+	// we MUST use protocol 34 for the netchan to ensure correct qport size (2 bytes).
+	// If the server IS an enhanced server, it will tell us in SVC_SERVERDATA and
+	// we'll update the netchan protocol then.
+	{
+		int netchanProtocol = cls.serverProtocol;
+		if (!cls.challengeExtras.sawProtocolList && cls.serverProtocol != ORIGINAL_PROTOCOL_VERSION) {
+			netchanProtocol = ORIGINAL_PROTOCOL_VERSION;
+		}
+		Netchan_Setup (NS_CLIENT, &cls.netChan, &cls.netFrom, netchanProtocol, cls.quakePort, cls.negotiatedMsgLen);
+	}
 
 	// Use challenge extras for HTTP download server if available (q2repro approach)
 	// This uses the dlserver= parsed from the challenge rather than connect args
