@@ -97,3 +97,11 @@ anticheat.txt
 
 # Python analysis tools (local dev)
 /tools/analyze_packet.py
+
+# Local scratch / test mods (not intended to ship)
+/coop/
+/q2rpg2/
+
+# Local one-off debug output
+/debug_output.txt
+/tools/parse_frame_tmp.py
