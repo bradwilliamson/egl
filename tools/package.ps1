@@ -140,8 +140,17 @@ if ($MakeArgs -and ($MakeArgs | Where-Object { $_ -match '^(?:USE_SDL2=1|USE_SDL
     Copy-Item -Force -Path $sdlDll -Destination (Join-Path $outRoot 'SDL2.dll')
 }
 
-# Stage required MinGW runtime DLLs (minizip, zlib, bzip2)
-$runtimeDlls = @('libminizip-1.dll', 'zlib1.dll', 'libbz2-1.dll')
+# Stage required runtime DLLs.
+# - App deps: minizip/zlib/bzip2
+# - Toolchain deps (needed on machines without MSYS2): libgcc/libstdc++/winpthread
+$runtimeDlls = @(
+    'libminizip-1.dll',
+    'zlib1.dll',
+    'libbz2-1.dll',
+    'libgcc_s_seh-1.dll',
+    'libstdc++-6.dll',
+    'libwinpthread-1.dll'
+)
 foreach ($dll in $runtimeDlls) {
     $dllPath = Join-Path $toolchainBin $dll
     if (Test-Path -LiteralPath $dllPath) {
