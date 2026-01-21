@@ -342,6 +342,18 @@ void Cmd_ExecuteString (char *text)
 #endif
 
 	// Command unknown
+	{
+		const char *unknownCmd = Cmd_Argv (0);
+		if (!Q_strnicmp (unknownCmd, "softlink", 8)) {
+			const unsigned char next = (unsigned char)unknownCmd[8];
+			if (next == 0 || next == '^' || next < 32) {
+				// Compatibility: some servers (or configs delivered via stufftext)
+				// emit stray "softlink" commands (sometimes with color/control suffix).
+				// Treat as a no-op to avoid spamming the console.
+				return;
+			}
+		}
+	}
 	Com_Printf (0, "Unknown command \"%s" S_STYLE_RETURN "\"\n", Cmd_Argv (0));
 }
 
