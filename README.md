@@ -1,6 +1,6 @@
 # EGL, an enhanced Quake II Engine
 Originally written by Echon.
-A backup of EGL 0.3.1, as it was, from QuakeSrc back in 2007.
+A backup of EGL 0.3.2, modernized from the original 0.3.1 QuakeSrc snapshot (circa 2007).
 
 ## Modernization status
 
