@@ -64,7 +64,7 @@ typedef struct m_vidSettingsMenu_s {
 
 static m_vidSettingsMenu_t	m_vidSettingsMenu;
 
-static char *m_vidSettings_resolutions[] = {
+static const char * const m_vidSettings_resolutions[] = {
 	// Must match renderer's mode table order (gl_mode indices) to keep configs stable.
 	"[CUSTOM    ]",
 
@@ -302,7 +302,7 @@ static void VIDSettingsMenu_Init (void)
 
 	m_vidSettingsMenu.mode_list.generic.type		= UITYPE_SPINCONTROL;
 	m_vidSettingsMenu.mode_list.generic.name		= "Resolution";
-	m_vidSettingsMenu.mode_list.itemNames			= m_vidSettings_resolutions;
+	m_vidSettingsMenu.mode_list.itemNames			= (char **)m_vidSettings_resolutions;
 	m_vidSettingsMenu.mode_list.generic.statusBar	= "Resolution Selection";
 
 	m_vidSettingsMenu.tm_list.generic.type		= UITYPE_SPINCONTROL;

@@ -187,6 +187,7 @@ void CG_Say_Preprocessor (void)
 	int		c;
 	trace_t	tr;
 	vec3_t	end;
+	const char	*msg;
 
 	if (cg_locationList) {
 		sayText = p = cgi.Cmd_Args ();
@@ -236,6 +237,24 @@ void CG_Say_Preprocessor (void)
 			}
 			sayText++;
 		}
+	}
+
+	// Some servers (e.g. q2admin) handle !version/!renderer without echoing the
+	// original chat text back to clients. In that case our client-side responder
+	// in CL_Parse won't see the trigger. Detect it locally when the player types
+	// it and spam our info immediately.
+	msg = cgi.Cmd_Args ();
+	while (*msg == ' ' || *msg == '\t')
+		msg++;
+	if (*msg == '"')
+		msg++;
+	while (*msg == ' ' || *msg == '\t')
+		msg++;
+	if (!Q_strnicmp (msg, "!version", 8) && (!msg[8] || msg[8] == '"' || msg[8] == ' ' || msg[8] == '\t')) {
+		cgi.Cbuf_AddText ("egl_version\n");
+	}
+	else if (!Q_strnicmp (msg, "!renderer", 9) && (!msg[9] || msg[9] == '"' || msg[9] == ' ' || msg[9] == '\t')) {
+		cgi.Cbuf_AddText ("egl_renderer\n");
 	}
 
 	if (cgi.CL_ForwardCmdToServer ())
