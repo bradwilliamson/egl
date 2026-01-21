@@ -48,6 +48,7 @@ glxState_t glxState;
 cVar_t *vid_xpos = NULL;
 cVar_t *vid_ypos = NULL;
 cVar_t *vid_fullscreen = NULL;
+static cVar_t *vid_fullscreen_desktop = NULL;
 static cVar_t *gl_swap_control = NULL;
 static cVar_t *gl_swap_interval = NULL;
 
@@ -165,7 +166,26 @@ qBool GLimp_AttemptMode (qBool fullScreen, int width, int height)
     ri.config.vidFrequency = 0;
 
     if (fullScreen) {
-        /* find best matching mode on the current display */
+        /* Check if we should use desktop fullscreen (borderless) or exclusive fullscreen */
+        qBool useDesktopFS = vid_fullscreen_desktop && vid_fullscreen_desktop->intVal;
+        
+        if (useDesktopFS) {
+            /* Desktop fullscreen - use native resolution, borderless */
+            if (SDL_SetWindowFullscreen (sdl_window, SDL_WINDOW_FULLSCREEN_DESKTOP) == 0) {
+                /* Get actual window size after going fullscreen */
+                int actualW, actualH;
+                SDL_GetWindowSize (sdl_window, &actualW, &actualH);
+                ri.config.vidFullScreen = qTrue;
+                ri.config.vidWidth = actualW;
+                ri.config.vidHeight = actualH;
+                Com_DevPrintf (0, "SDL2: Desktop fullscreen %dx%d\n", actualW, actualH);
+                return qTrue;
+            }
+            Com_Printf (PRNT_WARNING, "SDL2: Failed to set desktop fullscreen: %s\n", SDL_GetError ());
+            return qFalse;
+        }
+
+        /* Exclusive fullscreen - find best matching mode */
         int displayIndex = SDL_GetWindowDisplayIndex (sdl_window);
         int modeCount = SDL_GetNumDisplayModes (displayIndex);
         SDL_DisplayMode bestMode;
@@ -187,25 +207,32 @@ qBool GLimp_AttemptMode (qBool fullScreen, int width, int height)
         }
 
         if (bestIndex >= 0) {
+            /* Must set window size BEFORE going fullscreen for exclusive mode */
+            SDL_SetWindowSize (sdl_window, bestMode.w, bestMode.h);
             SDL_SetWindowDisplayMode (sdl_window, &bestMode);
             if (SDL_SetWindowFullscreen (sdl_window, SDL_WINDOW_FULLSCREEN) == 0) {
-                SDL_SetWindowSize (sdl_window, width, height);
-				ri.config.vidFullScreen = qTrue;
-				ri.config.vidWidth = width;
-				ri.config.vidHeight = height;
+                ri.config.vidFullScreen = qTrue;
+                ri.config.vidWidth = bestMode.w;
+                ri.config.vidHeight = bestMode.h;
+                Com_DevPrintf (0, "SDL2: Exclusive fullscreen %dx%d\n", bestMode.w, bestMode.h);
                 return qTrue;
             }
+            Com_Printf (PRNT_WARNING, "SDL2: Failed to set exclusive fullscreen: %s\n", SDL_GetError ());
         }
         return qFalse;
     }
 
-    /* Windowed mode */
-    SDL_SetWindowFullscreen (sdl_window, 0);
+    /* Windowed mode - must clear fullscreen flag first */
+    if (SDL_SetWindowFullscreen (sdl_window, 0) != 0) {
+        Com_Printf (PRNT_WARNING, "SDL2: Failed to exit fullscreen: %s\n", SDL_GetError ());
+    }
     SDL_SetWindowSize (sdl_window, width, height);
+    SDL_SetWindowPosition (sdl_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
-	ri.config.vidFullScreen = qFalse;
-	ri.config.vidWidth = width;
-	ri.config.vidHeight = height;
+    ri.config.vidFullScreen = qFalse;
+    ri.config.vidWidth = width;
+    ri.config.vidHeight = height;
+    Com_DevPrintf (0, "SDL2: Windowed mode %dx%d\n", width, height);
     return qTrue;
 }
 
@@ -226,7 +253,7 @@ void GLimp_EndFrame (void)
 }
 
 /* ---------- Video management / VID_* ---------- */
-static void VID_Restart_f (void)
+void VID_Restart_f (void)
 {
     vid_queueRestart = qTrue;
 }
@@ -310,7 +337,9 @@ void VID_Init (refConfig_t *outConfig)
 {
     vid_xpos = Cvar_Register ("vid_xpos", "3", CVAR_ARCHIVE);
     vid_ypos = Cvar_Register ("vid_ypos", "22", CVAR_ARCHIVE);
-    vid_fullscreen = Cvar_Register ("vid_fullscreen", "0", CVAR_ARCHIVE);
+    // Match Win32 behavior: default fullscreen, apply on vid_restart (latched)
+    vid_fullscreen = Cvar_Register ("vid_fullscreen", "1", CVAR_ARCHIVE|CVAR_LATCH_VIDEO);
+    vid_fullscreen_desktop = Cvar_Register ("vid_fullscreen_desktop", "1", CVAR_ARCHIVE);
 
     Cmd_AddCommand ("vid_restart", VID_Restart_f, "Restarts refresh and media");
     Cmd_AddCommand ("vid_front", VID_Front_f, "Brings window to front");

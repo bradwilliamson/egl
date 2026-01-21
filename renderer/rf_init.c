@@ -463,7 +463,9 @@ static qBool R_SetMode (void)
 		Com_Printf (PRNT_ERROR, "...failed to set fullscreen, attempting windowed\n");
 
 		if (GLimp_AttemptMode (qFalse, width, height)) {
-			Cvar_VariableSetValue (vid_fullscreen, (float)ri.config.vidFullScreen, qTrue);
+			// Don't persistently flip vid_fullscreen off just because a fullscreen
+			// transition failed (can be transient on some platforms). Leave the user's
+			// requested setting intact so the next restart can retry fullscreen.
 			return qTrue;
 		}
 	}

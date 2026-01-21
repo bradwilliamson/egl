@@ -892,7 +892,8 @@ void Snd_Init (void)
 	s_volume			= Cvar_Register ("s_volume",			"0.7",			CVAR_ARCHIVE);
 	s_loadas8bit		= Cvar_Register ("s_loadas8bit",		"0",			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
 
-	s_khz				= Cvar_Register ("s_khz",				"11",			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
+	// Default to higher quality mixing (CD-like). Users can still override via config/menu.
+	s_khz				= Cvar_Register ("s_khz",				"48",			CVAR_ARCHIVE|CVAR_LATCH_AUDIO);
 	s_mixahead			= Cvar_Register ("s_mixahead",			"0.2",			CVAR_ARCHIVE);
 	s_show				= Cvar_Register ("s_show",				"0",			CVAR_CHEAT);
 	s_testsound			= Cvar_Register ("s_testsound",			"0",			0);

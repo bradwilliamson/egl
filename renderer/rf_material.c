@@ -1812,7 +1812,8 @@ static material_t *R_NewMaterial (char *fixedName, matPathType_t pathType)
 {
 	material_t	*mat;
 
-	assert (fixedName && fixedName[0]);
+	if (!fixedName || !fixedName[0])
+		return NULL;
 
 	// Select material spot
 	if (r_numMaterials+1 >= MAX_MATERIALS)
@@ -2449,6 +2450,8 @@ static void R_ParseMaterialFile (char *fixedName, matPathType_t pathType)
 			default:
 				Com_NormalizePath (matName, sizeof (matName), token);
 				mat = R_NewMaterial (matName, pathType);
+				if (!mat)
+									Mat_Printf (PRNT_ERROR, "...ERROR: invalid material name '%s' in '%s'\n", matName, fixedName);
 				break;
 			}
 		}
@@ -2598,7 +2601,6 @@ static material_t *R_RegisterMaterial (char *name, qBool forceDefault, matRegTyp
 	char			fixedName[MAX_QPATH];
 	byte			*buffer;
 
-	assert (name && name[0]);
 	if (!name || !name[0])
 		return NULL;
 	if (strlen(name)+1 >= MAX_QPATH) {
@@ -2655,6 +2657,8 @@ static material_t *R_RegisterMaterial (char *name, qBool forceDefault, matRegTyp
 
 	// Default material
 	mat = R_NewMaterial (fixedName, MAT_PATHTYPE_INTERNAL);
+	if (!mat)
+		return NULL;
 	mat->sizeBase = 0;
 	mat->surfParams = surfParams;
 	mat->flags = 0;

@@ -83,7 +83,7 @@ qBool Snd_SDL_Init (void)
 {
     /* Register sound cvars if not already done */
     if (!s_bits) s_bits = Cvar_Register ("s_bits", "16", CVAR_ARCHIVE);
-    if (!s_speed) s_speed = Cvar_Register ("s_speed", "44100", CVAR_ARCHIVE);
+    if (!s_speed) s_speed = Cvar_Register ("s_speed", "48000", CVAR_ARCHIVE);
     if (!s_channels) s_channels = Cvar_Register ("s_channels", "2", CVAR_ARCHIVE);
 
     int bits = s_bits ? s_bits->intVal : 16;

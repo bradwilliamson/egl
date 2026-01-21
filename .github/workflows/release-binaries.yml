@@ -27,8 +27,8 @@ jobs:
 
       - name: Create zip
         run: |
-          cd out
-          zip -r "egl-${{ github.ref_name }}-linux.zip" egl-linux
+          cd out/egl-linux
+          zip -r "../egl-${{ github.ref_name }}-linux.zip" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -74,7 +74,7 @@ jobs:
         run: |
           $zip = "egl-${{ github.ref_name }}-windows-x64.zip"
           if (Test-Path $zip) { Remove-Item -Force $zip }
-          Compress-Archive -Path "out\\egl-windows" -DestinationPath $zip
+          Compress-Archive -Path "out\\egl-windows\\*" -DestinationPath $zip -CompressionLevel Optimal
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

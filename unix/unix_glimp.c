@@ -337,7 +337,8 @@ void VID_Init (refConfig_t *outConfig)
 {
 	vid_xpos = Cvar_Register ("vid_xpos", "3", CVAR_ARCHIVE);
 	vid_ypos = Cvar_Register ("vid_ypos", "22", CVAR_ARCHIVE);
-	vid_fullscreen = Cvar_Register ("vid_fullscreen", "0", CVAR_ARCHIVE);
+	// Default fullscreen; apply on vid_restart (latched)
+	vid_fullscreen = Cvar_Register ("vid_fullscreen", "1", CVAR_ARCHIVE|CVAR_LATCH_VIDEO);
 
 	/* VSync / swap control */
 	gl_swap_control = Cvar_Register ("gl_swap_control", "1", CVAR_ARCHIVE);
