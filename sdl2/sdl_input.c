@@ -16,6 +16,9 @@ should be implemented later.
 #  include <SDL2/SDL.h>
 #endif
 
+/* From sdl_glimp.c */
+extern cVar_t *vid_fullscreen;
+
 void SDL2_SetMouseGrab (qBool grab);
 void SDL2_OnWindowResized (int width, int height);
 void GLimp_AppActivate (qBool active);
@@ -129,6 +132,16 @@ void SDL2_PollInputEvents (void)
             /* Ignore SDL key repeat - the engine handles its own repeat logic */
             if (ev.key.repeat)
                 break;
+            
+            /* Alt+Enter toggles fullscreen */
+            if (ev.key.keysym.sym == SDLK_RETURN && (ev.key.keysym.mod & KMOD_ALT)) {
+                if (vid_fullscreen) {
+                    Cvar_VariableSetValue (vid_fullscreen, !vid_fullscreen->intVal, qTrue);
+                    Cbuf_AddText ("vid_restart\n");
+                }
+                break;
+            }
+            
             keyNum_t k = SDL2_TranslateKey (ev.key.keysym.sym);
             if (k != K_BADKEY)
                 Key_Event ((int)k, qTrue, Sys_Milliseconds ());
