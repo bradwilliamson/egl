@@ -29,6 +29,7 @@ static qBool sdl_appActive = qTrue;
 static qBool sdl_mouseGrabbed = qFalse;
 
 static cVar_t *in_joystick = NULL;
+static cVar_t *in_joystick_auto = NULL;
 static cVar_t *joy_deadzone = NULL;
 static cVar_t *joy_move_scale = NULL;
 static cVar_t *joy_look_scale = NULL;
@@ -239,6 +240,15 @@ static void SDL2_UpdateControllerEnabled (void)
     }
 }
 
+static qBool SDL2_WantsController (void)
+{
+    if (in_joystick && in_joystick->intVal)
+        return qTrue;
+    if (in_joystick_auto && in_joystick_auto->intVal)
+        return qTrue;
+    return qFalse;
+}
+
 static void IN_Rumble_f (void)
 {
     int low = 0, high = 0, ms = 200;
@@ -330,8 +340,12 @@ void SDL2_PollInputEvents (void)
             break;
 
         case SDL_CONTROLLERDEVICEADDED:
-            if (in_joystick && in_joystick->intVal)
-                SDL2_OpenFirstController ();
+            if (SDL2_WantsController ()) {
+                if (!sdl_controller) {
+                    if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
+                        Cvar_VariableSetValue (in_joystick, 1, qFalse);
+                }
+            }
             break;
 
         case SDL_CONTROLLERDEVICEREMOVED:
@@ -523,6 +537,7 @@ void IN_Init (void)
 
     // Keep legacy CVAR name so existing menus/scripts work.
     in_joystick = Cvar_Register ("in_joystick", "0", CVAR_ARCHIVE);
+    in_joystick_auto = Cvar_Register ("in_joystick_auto", "0", CVAR_ARCHIVE);
     joy_deadzone = Cvar_Register ("joy_deadzone", "0.15", CVAR_ARCHIVE);
     joy_move_scale = Cvar_Register ("joy_move_scale", "1.0", CVAR_ARCHIVE);
     joy_look_scale = Cvar_Register ("joy_look_scale", "700", CVAR_ARCHIVE);
@@ -535,8 +550,10 @@ void IN_Init (void)
     if (!cmd_joy_rumble)
         cmd_joy_rumble = Cmd_AddCommand ("joy_rumble", IN_Rumble_f, "Test gamepad rumble: joy_rumble <low 0-65535> <high 0-65535> <ms>");
 
-    if (in_joystick && in_joystick->intVal)
-        SDL2_OpenFirstController ();
+    if (SDL2_WantsController ()) {
+        if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
+            Cvar_VariableSetValue (in_joystick, 1, qFalse);
+    }
 }
 
 void IN_Shutdown (void)

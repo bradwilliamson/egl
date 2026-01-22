@@ -40,6 +40,17 @@ typedef struct m_inputMenu_s {
 
 	uiList_t		always_run_toggle;
 	uiList_t		joystick_toggle;
+	uiList_t		joystick_auto_toggle;
+
+	uiSlider_t	joy_deadzone_slider;
+	uiSlider_t	joy_deadzone_amount;
+	uiSlider_t	joy_move_scale_slider;
+	uiSlider_t	joy_move_scale_amount;
+	uiSlider_t	joy_look_scale_slider;
+	uiSlider_t	joy_look_scale_amount;
+	uiList_t		joy_invert_y_toggle;
+	uiSlider_t	joy_trigger_threshold_slider;
+	uiSlider_t	joy_trigger_threshold_amount;
 
 	uiSlider_t		ui_sensitivity_slider;
 	uiSlider_t		ui_sensitivity_amount;
@@ -65,6 +76,40 @@ static void AlwaysRunFunc (void *unused)
 static void JoystickFunc (void *unused)
 {
 	cgi.Cvar_SetValue ("in_joystick", m_inputMenu.joystick_toggle.curValue, qFalse);
+}
+
+static void JoystickAutoFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("in_joystick_auto", m_inputMenu.joystick_auto_toggle.curValue, qFalse);
+}
+
+static void JoyDeadzoneFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_deadzone", m_inputMenu.joy_deadzone_slider.curValue / 100.0F, qFalse);
+	m_inputMenu.joy_deadzone_amount.generic.name = cgi.Cvar_GetStringValue ("joy_deadzone");
+}
+
+static void JoyMoveScaleFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_move_scale", m_inputMenu.joy_move_scale_slider.curValue / 100.0F, qFalse);
+	m_inputMenu.joy_move_scale_amount.generic.name = cgi.Cvar_GetStringValue ("joy_move_scale");
+}
+
+static void JoyLookScaleFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_look_scale", m_inputMenu.joy_look_scale_slider.curValue, qFalse);
+	m_inputMenu.joy_look_scale_amount.generic.name = cgi.Cvar_GetStringValue ("joy_look_scale");
+}
+
+static void JoyInvertYFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_invert_y", m_inputMenu.joy_invert_y_toggle.curValue, qFalse);
+}
+
+static void JoyTriggerThresholdFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_trigger_threshold", m_inputMenu.joy_trigger_threshold_slider.curValue / 100.0F, qFalse);
+	m_inputMenu.joy_trigger_threshold_amount.generic.name = cgi.Cvar_GetStringValue ("joy_trigger_threshold");
 }
 
 static void UISensFunc (void *unused)
@@ -123,6 +168,28 @@ static void InputMenu_SetValues (void)
 
 	cgi.Cvar_SetValue ("in_joystick",			clamp (cgi.Cvar_GetIntegerValue ("in_joystick"), 0, 1), qFalse);
 	m_inputMenu.joystick_toggle.curValue		= cgi.Cvar_GetIntegerValue ("in_joystick");
+
+	cgi.Cvar_SetValue ("in_joystick_auto",			clamp (cgi.Cvar_GetIntegerValue ("in_joystick_auto"), 0, 1), qFalse);
+	m_inputMenu.joystick_auto_toggle.curValue		= cgi.Cvar_GetIntegerValue ("in_joystick_auto");
+
+	cgi.Cvar_SetValue ("joy_deadzone",			clamp (cgi.Cvar_GetFloatValue ("joy_deadzone"), 0.0f, 0.50f), qFalse);
+	m_inputMenu.joy_deadzone_slider.curValue		= (cgi.Cvar_GetFloatValue ("joy_deadzone")) * 100.0f;
+	m_inputMenu.joy_deadzone_amount.generic.name		= cgi.Cvar_GetStringValue ("joy_deadzone");
+
+	cgi.Cvar_SetValue ("joy_move_scale",			clamp (cgi.Cvar_GetFloatValue ("joy_move_scale"), 0.25f, 3.00f), qFalse);
+	m_inputMenu.joy_move_scale_slider.curValue		= (cgi.Cvar_GetFloatValue ("joy_move_scale")) * 100.0f;
+	m_inputMenu.joy_move_scale_amount.generic.name		= cgi.Cvar_GetStringValue ("joy_move_scale");
+
+	cgi.Cvar_SetValue ("joy_look_scale",			clamp (cgi.Cvar_GetIntegerValue ("joy_look_scale"), 50, 5000), qFalse);
+	m_inputMenu.joy_look_scale_slider.curValue		= cgi.Cvar_GetIntegerValue ("joy_look_scale");
+	m_inputMenu.joy_look_scale_amount.generic.name		= cgi.Cvar_GetStringValue ("joy_look_scale");
+
+	cgi.Cvar_SetValue ("joy_invert_y",			clamp (cgi.Cvar_GetIntegerValue ("joy_invert_y"), 0, 1), qFalse);
+	m_inputMenu.joy_invert_y_toggle.curValue		= cgi.Cvar_GetIntegerValue ("joy_invert_y");
+
+	cgi.Cvar_SetValue ("joy_trigger_threshold",			clamp (cgi.Cvar_GetFloatValue ("joy_trigger_threshold"), 0.01f, 1.00f), qFalse);
+	m_inputMenu.joy_trigger_threshold_slider.curValue	= (cgi.Cvar_GetFloatValue ("joy_trigger_threshold")) * 100.0f;
+	m_inputMenu.joy_trigger_threshold_amount.generic.name	= cgi.Cvar_GetStringValue ("joy_trigger_threshold");
 
 	m_inputMenu.ui_sensitivity_slider.curValue		= (cgi.Cvar_GetFloatValue ("ui_sensitivity")) * 2;
 	m_inputMenu.ui_sensitivity_amount.generic.name = cgi.Cvar_GetStringValue ("ui_sensitivity");
@@ -192,10 +259,58 @@ static void InputMenu_Init (void)
 	m_inputMenu.always_run_toggle.generic.statusBar	= "Always Run";
 
 	m_inputMenu.joystick_toggle.generic.type		= UITYPE_SPINCONTROL;
-	m_inputMenu.joystick_toggle.generic.name		= "Use joystick";
+	m_inputMenu.joystick_toggle.generic.name		= "Use gamepad";
 	m_inputMenu.joystick_toggle.generic.callBack	= JoystickFunc;
 	m_inputMenu.joystick_toggle.itemNames			= yesno_names;
-	m_inputMenu.joystick_toggle.generic.statusBar	= "Use Joystick";
+	m_inputMenu.joystick_toggle.generic.statusBar	= "Enable gamepad input";
+
+	m_inputMenu.joystick_auto_toggle.generic.type		= UITYPE_SPINCONTROL;
+	m_inputMenu.joystick_auto_toggle.generic.name		= "Auto enable";
+	m_inputMenu.joystick_auto_toggle.generic.callBack	= JoystickAutoFunc;
+	m_inputMenu.joystick_auto_toggle.itemNames			= yesno_names;
+	m_inputMenu.joystick_auto_toggle.generic.statusBar	= "Auto-enable gamepad when one is detected";
+
+	m_inputMenu.joy_deadzone_slider.generic.type		= UITYPE_SLIDER;
+	m_inputMenu.joy_deadzone_slider.generic.name		= "Pad deadzone";
+	m_inputMenu.joy_deadzone_slider.generic.callBack	= JoyDeadzoneFunc;
+	m_inputMenu.joy_deadzone_slider.minValue			= 0;
+	m_inputMenu.joy_deadzone_slider.maxValue			= 50;
+	m_inputMenu.joy_deadzone_slider.generic.statusBar	= "Left/right stick deadzone";
+	m_inputMenu.joy_deadzone_amount.generic.type		= UITYPE_ACTION;
+	m_inputMenu.joy_deadzone_amount.generic.flags		= UIF_LEFT_JUSTIFY|UIF_NOSELECT;
+
+	m_inputMenu.joy_move_scale_slider.generic.type		= UITYPE_SLIDER;
+	m_inputMenu.joy_move_scale_slider.generic.name		= "Pad move";
+	m_inputMenu.joy_move_scale_slider.generic.callBack	= JoyMoveScaleFunc;
+	m_inputMenu.joy_move_scale_slider.minValue			= 25;
+	m_inputMenu.joy_move_scale_slider.maxValue			= 300;
+	m_inputMenu.joy_move_scale_slider.generic.statusBar	= "Gamepad movement scale";
+	m_inputMenu.joy_move_scale_amount.generic.type		= UITYPE_ACTION;
+	m_inputMenu.joy_move_scale_amount.generic.flags		= UIF_LEFT_JUSTIFY|UIF_NOSELECT;
+
+	m_inputMenu.joy_look_scale_slider.generic.type		= UITYPE_SLIDER;
+	m_inputMenu.joy_look_scale_slider.generic.name		= "Pad look";
+	m_inputMenu.joy_look_scale_slider.generic.callBack	= JoyLookScaleFunc;
+	m_inputMenu.joy_look_scale_slider.minValue			= 50;
+	m_inputMenu.joy_look_scale_slider.maxValue			= 5000;
+	m_inputMenu.joy_look_scale_slider.generic.statusBar	= "Gamepad look speed";
+	m_inputMenu.joy_look_scale_amount.generic.type		= UITYPE_ACTION;
+	m_inputMenu.joy_look_scale_amount.generic.flags		= UIF_LEFT_JUSTIFY|UIF_NOSELECT;
+
+	m_inputMenu.joy_invert_y_toggle.generic.type		= UITYPE_SPINCONTROL;
+	m_inputMenu.joy_invert_y_toggle.generic.name		= "Pad invert Y";
+	m_inputMenu.joy_invert_y_toggle.generic.callBack	= JoyInvertYFunc;
+	m_inputMenu.joy_invert_y_toggle.itemNames			= yesno_names;
+	m_inputMenu.joy_invert_y_toggle.generic.statusBar	= "Invert gamepad look up/down";
+
+	m_inputMenu.joy_trigger_threshold_slider.generic.type		= UITYPE_SLIDER;
+	m_inputMenu.joy_trigger_threshold_slider.generic.name		= "Pad triggers";
+	m_inputMenu.joy_trigger_threshold_slider.generic.callBack	= JoyTriggerThresholdFunc;
+	m_inputMenu.joy_trigger_threshold_slider.minValue			= 1;
+	m_inputMenu.joy_trigger_threshold_slider.maxValue			= 100;
+	m_inputMenu.joy_trigger_threshold_slider.generic.statusBar	= "Trigger threshold for digital bind events";
+	m_inputMenu.joy_trigger_threshold_amount.generic.type		= UITYPE_ACTION;
+	m_inputMenu.joy_trigger_threshold_amount.generic.flags		= UIF_LEFT_JUSTIFY|UIF_NOSELECT;
 
 	m_inputMenu.ui_sensitivity_slider.generic.type		= UITYPE_SLIDER;
 	m_inputMenu.ui_sensitivity_slider.generic.name		= "UI speed";
@@ -264,6 +379,17 @@ static void InputMenu_Init (void)
 
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.always_run_toggle);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joystick_toggle);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joystick_auto_toggle);
+
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_deadzone_slider);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_deadzone_amount);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_move_scale_slider);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_move_scale_amount);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_look_scale_slider);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_look_scale_amount);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_invert_y_toggle);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_trigger_threshold_slider);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_trigger_threshold_amount);
 
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.ui_sensitivity_slider);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.ui_sensitivity_amount);
@@ -322,6 +448,31 @@ static void InputMenu_Draw (void)
 	m_inputMenu.always_run_toggle.generic.y			= y += UIFT_SIZEINC + UIFT_SIZEINCMED;
 	m_inputMenu.joystick_toggle.generic.x			= 0;
 	m_inputMenu.joystick_toggle.generic.y			= y += UIFT_SIZEINC;
+	m_inputMenu.joystick_auto_toggle.generic.x		= 0;
+	m_inputMenu.joystick_auto_toggle.generic.y		= y += UIFT_SIZEINC;
+
+	m_inputMenu.joy_deadzone_slider.generic.x			= 0;
+	m_inputMenu.joy_deadzone_slider.generic.y			= y += UIFT_SIZEINC;
+	m_inputMenu.joy_deadzone_amount.generic.x			= (UIFT_SIZE * (SLIDER_RANGE + 5));
+	m_inputMenu.joy_deadzone_amount.generic.y			= y;
+
+	m_inputMenu.joy_move_scale_slider.generic.x			= 0;
+	m_inputMenu.joy_move_scale_slider.generic.y			= y += UIFT_SIZEINC;
+	m_inputMenu.joy_move_scale_amount.generic.x			= (UIFT_SIZE * (SLIDER_RANGE + 5));
+	m_inputMenu.joy_move_scale_amount.generic.y			= y;
+
+	m_inputMenu.joy_look_scale_slider.generic.x			= 0;
+	m_inputMenu.joy_look_scale_slider.generic.y			= y += UIFT_SIZEINC;
+	m_inputMenu.joy_look_scale_amount.generic.x			= (UIFT_SIZE * (SLIDER_RANGE + 5));
+	m_inputMenu.joy_look_scale_amount.generic.y			= y;
+
+	m_inputMenu.joy_invert_y_toggle.generic.x			= 0;
+	m_inputMenu.joy_invert_y_toggle.generic.y			= y += UIFT_SIZEINC;
+
+	m_inputMenu.joy_trigger_threshold_slider.generic.x	= 0;
+	m_inputMenu.joy_trigger_threshold_slider.generic.y	= y += UIFT_SIZEINC;
+	m_inputMenu.joy_trigger_threshold_amount.generic.x	= (UIFT_SIZE * (SLIDER_RANGE + 5));
+	m_inputMenu.joy_trigger_threshold_amount.generic.y	= y;
 	m_inputMenu.ui_sensitivity_slider.generic.x		= 0;
 	m_inputMenu.ui_sensitivity_slider.generic.y		= y += (UIFT_SIZEINC*2);
 	m_inputMenu.ui_sensitivity_amount.generic.x		= (UIFT_SIZE * (SLIDER_RANGE + 5));
