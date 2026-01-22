@@ -615,7 +615,7 @@ void IN_Init (void)
     joy_autobind = Cvar_Register ("joy_autobind", "1", CVAR_ARCHIVE);
     joy_deadzone = Cvar_Register ("joy_deadzone", "0.15", CVAR_ARCHIVE);
     joy_move_scale = Cvar_Register ("joy_move_scale", "1.0", CVAR_ARCHIVE);
-    joy_look_scale = Cvar_Register ("joy_look_scale", "700", CVAR_ARCHIVE);
+    joy_look_scale = Cvar_Register ("joy_look_scale", "1800", CVAR_ARCHIVE);
     joy_invert_y = Cvar_Register ("joy_invert_y", "0", CVAR_ARCHIVE);
     joy_trigger_threshold = Cvar_Register ("joy_trigger_threshold", "0.55", CVAR_ARCHIVE);
 
