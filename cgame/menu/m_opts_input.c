@@ -41,6 +41,9 @@ typedef struct m_inputMenu_s {
 	uiList_t		always_run_toggle;
 	uiList_t		joystick_toggle;
 	uiList_t		joystick_auto_toggle;
+	uiList_t		joy_autobind_toggle;
+	uiAction_t	apply_gamepad_binds_action;
+	uiAction_t	clear_gamepad_binds_action;
 
 	uiSlider_t	joy_deadzone_slider;
 	uiSlider_t	joy_deadzone_amount;
@@ -81,6 +84,21 @@ static void JoystickFunc (void *unused)
 static void JoystickAutoFunc (void *unused)
 {
 	cgi.Cvar_SetValue ("in_joystick_auto", m_inputMenu.joystick_auto_toggle.curValue, qFalse);
+}
+
+static void JoyAutobindFunc (void *unused)
+{
+	cgi.Cvar_SetValue ("joy_autobind", m_inputMenu.joy_autobind_toggle.curValue, qFalse);
+}
+
+static void ApplyGamepadBindsFunc (void *unused)
+{
+	cgi.Cbuf_InsertText ("joy_bind_defaults\n");
+}
+
+static void ClearGamepadBindsFunc (void *unused)
+{
+	cgi.Cbuf_InsertText ("joy_unbindall\n");
 }
 
 static void JoyDeadzoneFunc (void *unused)
@@ -171,6 +189,9 @@ static void InputMenu_SetValues (void)
 
 	cgi.Cvar_SetValue ("in_joystick_auto",			clamp (cgi.Cvar_GetIntegerValue ("in_joystick_auto"), 0, 1), qFalse);
 	m_inputMenu.joystick_auto_toggle.curValue		= cgi.Cvar_GetIntegerValue ("in_joystick_auto");
+
+	cgi.Cvar_SetValue ("joy_autobind",			clamp (cgi.Cvar_GetIntegerValue ("joy_autobind"), 0, 1), qFalse);
+	m_inputMenu.joy_autobind_toggle.curValue		= cgi.Cvar_GetIntegerValue ("joy_autobind");
 
 	cgi.Cvar_SetValue ("joy_deadzone",			clamp (cgi.Cvar_GetFloatValue ("joy_deadzone"), 0.0f, 0.50f), qFalse);
 	m_inputMenu.joy_deadzone_slider.curValue		= (cgi.Cvar_GetFloatValue ("joy_deadzone")) * 100.0f;
@@ -269,6 +290,22 @@ static void InputMenu_Init (void)
 	m_inputMenu.joystick_auto_toggle.generic.callBack	= JoystickAutoFunc;
 	m_inputMenu.joystick_auto_toggle.itemNames			= yesno_names;
 	m_inputMenu.joystick_auto_toggle.generic.statusBar	= "Auto-enable gamepad when one is detected";
+
+	m_inputMenu.joy_autobind_toggle.generic.type		= UITYPE_SPINCONTROL;
+	m_inputMenu.joy_autobind_toggle.generic.name		= "Auto bind";
+	m_inputMenu.joy_autobind_toggle.generic.callBack	= JoyAutobindFunc;
+	m_inputMenu.joy_autobind_toggle.itemNames			= yesno_names;
+	m_inputMenu.joy_autobind_toggle.generic.statusBar	= "Auto-apply default gamepad binds when a controller is first detected";
+
+	m_inputMenu.apply_gamepad_binds_action.generic.type		= UITYPE_ACTION;
+	m_inputMenu.apply_gamepad_binds_action.generic.name		= "Apply gamepad defaults";
+	m_inputMenu.apply_gamepad_binds_action.generic.callBack	= ApplyGamepadBindsFunc;
+	m_inputMenu.apply_gamepad_binds_action.generic.statusBar	= "Apply default gamepad binds (won't overwrite existing binds)";
+
+	m_inputMenu.clear_gamepad_binds_action.generic.type		= UITYPE_ACTION;
+	m_inputMenu.clear_gamepad_binds_action.generic.name		= "Clear gamepad binds";
+	m_inputMenu.clear_gamepad_binds_action.generic.callBack	= ClearGamepadBindsFunc;
+	m_inputMenu.clear_gamepad_binds_action.generic.statusBar	= "Clear JOY/AUX bindings (keyboard/mouse untouched)";
 
 	m_inputMenu.joy_deadzone_slider.generic.type		= UITYPE_SLIDER;
 	m_inputMenu.joy_deadzone_slider.generic.name		= "Pad deadzone";
@@ -380,6 +417,9 @@ static void InputMenu_Init (void)
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.always_run_toggle);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joystick_toggle);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joystick_auto_toggle);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_autobind_toggle);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.apply_gamepad_binds_action);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.clear_gamepad_binds_action);
 
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_deadzone_slider);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_deadzone_amount);
@@ -450,6 +490,12 @@ static void InputMenu_Draw (void)
 	m_inputMenu.joystick_toggle.generic.y			= y += UIFT_SIZEINC;
 	m_inputMenu.joystick_auto_toggle.generic.x		= 0;
 	m_inputMenu.joystick_auto_toggle.generic.y		= y += UIFT_SIZEINC;
+	m_inputMenu.joy_autobind_toggle.generic.x		= 0;
+	m_inputMenu.joy_autobind_toggle.generic.y		= y += UIFT_SIZEINC;
+	m_inputMenu.apply_gamepad_binds_action.generic.x	= 0;
+	m_inputMenu.apply_gamepad_binds_action.generic.y	= y += UIFT_SIZEINC;
+	m_inputMenu.clear_gamepad_binds_action.generic.x	= 0;
+	m_inputMenu.clear_gamepad_binds_action.generic.y	= y += UIFT_SIZEINC;
 
 	m_inputMenu.joy_deadzone_slider.generic.x			= 0;
 	m_inputMenu.joy_deadzone_slider.generic.y			= y += UIFT_SIZEINC;

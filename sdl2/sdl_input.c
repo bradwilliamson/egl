@@ -57,6 +57,7 @@ static qBool sdl_trigger_r_down = qFalse;
 static void *cmd_in_restart = NULL;
 static void *cmd_joy_rumble = NULL;
 static void *cmd_joy_bind_defaults = NULL;
+static void *cmd_joy_unbindall = NULL;
 
 static qBool sdl_joy_bind_attempted = qFalse;
 
@@ -237,6 +238,19 @@ static void IN_JoyBindDefaults_f (void)
             force = qTrue;
     }
     SDL2_ApplyDefaultGamepadBinds (force);
+}
+
+static void IN_JoyUnbindAll_f (void)
+{
+    int k;
+
+    for (k = K_JOY1; k <= K_JOY4; k++)
+        Key_SetBinding ((keyNum_t)k, "");
+
+    for (k = K_AUX1; k <= K_AUX32; k++)
+        Key_SetBinding ((keyNum_t)k, "");
+
+    Com_Printf (0, "Gamepad: cleared JOY/AUX bindings (keyboard/mouse untouched)\n");
 }
 
 static qBool SDL2_OpenFirstController (void)
@@ -628,6 +642,9 @@ void IN_Init (void)
     if (!cmd_joy_bind_defaults)
         cmd_joy_bind_defaults = Cmd_AddCommand ("joy_bind_defaults", IN_JoyBindDefaults_f, "Apply default gamepad binds (won't override existing binds unless -force)");
 
+    if (!cmd_joy_unbindall)
+        cmd_joy_unbindall = Cmd_AddCommand ("joy_unbindall", IN_JoyUnbindAll_f, "Clear all JOY/AUX bindings (keyboard/mouse untouched)");
+
     if (SDL2_WantsController ()) {
         if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
             Cvar_VariableSetValue (in_joystick, 1, qFalse);
@@ -643,6 +660,11 @@ void IN_Shutdown (void)
     if (cmd_joy_bind_defaults) {
         Cmd_RemoveCommand ("joy_bind_defaults", cmd_joy_bind_defaults);
         cmd_joy_bind_defaults = NULL;
+    }
+
+    if (cmd_joy_unbindall) {
+        Cmd_RemoveCommand ("joy_unbindall", cmd_joy_unbindall);
+        cmd_joy_unbindall = NULL;
     }
 
     if (cmd_joy_rumble) {
