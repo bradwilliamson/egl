@@ -1,4 +1,41 @@
 
+==================================================
+Modern TODO (2026) — curated shortlist
+==================================================
+
+This section is meant to be the current, actionable roadmap.
+The original legacy TODO from the 2000s is preserved below (unchanged).
+
+High leverage (worth doing)
+- [ ] Reduce worst-case stack usage in flagged functions (convert large locals to heap/tag allocations)
+  Targets called out in legacy list: FS_FindFiles, R_LoadMD2Model, Key_FileSubComplete, CM_Q3BSP_CreatePatchesForLeafs, etc.
+- [ ] Console/chat editing correctness
+  - paste at cursor (not always at end)
+  - harden against crashy repeated binds (e.g. holding a key with lots of expansions)
+- [ ] Harden parsing paths (remove remaining strtok-style parsing in hot/fragile areas)
+  Prefer Com_Parse-style tokenization; avoid ambiguous brace handling in material parsing.
+- [ ] Materials error recovery
+  Ensure a material load failure cannot leave registries in a partially-initialized state.
+- [ ] Audio robustness
+  OpenAL NaN sanitization (small change, prevents rare “blow ups” with bad input)
+
+Nice-to-have
+- [ ] Input polish
+  International keyboard support; better key identification (LSHIFT/RSHIFT etc). DInput only if needed.
+- [ ] Performance: reduce malloc/free thrashing during map load
+  Especially for file enumeration / asset loads.
+- [ ] Renderer correctness issues that are still reproducible today
+  (e.g. fullscreen alt-tab related GL error spam, transparent surface edge cases)
+
+Big projects (only if you want EGL to become a long-term renderer playground)
+- [ ] Particle system rewrite / emitter batching & bounds-based culling
+- [ ] GLSL pipeline / modern shader path
+- [ ] Emissive pipeline upgrades (FBO capture, emissiveToo, distortion effects)
+- [ ] Shadow maps / adaptive vsync / lightmap packing overhaul
+
+Mostly obsolete / already present
+- [ ] HTTPDL: appears to already exist behind CL_HTTPDL; only revisit if it’s broken or disabled by default
+- [ ] Mod-specific items (DDay/Gloom/KoTS): only prioritize if you actively target those mods
 
 
 
@@ -22,6 +59,17 @@
 
 
 
+
+
+
+
+
+==================================================
+Legacy TODO (2000s) — preserved below
+==================================================
+Legend:
+- OBSOLETE(SDL2): superseded by SDL2/modern toolchains
+- RECHECK(SDL2): may still be a bug, but SDL2 changes the likely root cause/implementation
 
 - Cleanup functions with ridiculous stack sizes:
 
@@ -144,7 +192,7 @@ Generic
 ==================================================
 Cleanups
 - pull MAX_QPATH out of places it shouldn't be in
-- Get EGL compiling on the 'Bloodshed' compiler and the FUCKING shitty MinGW compiler
+- OBSOLETE(SDL2): Get EGL compiling on the 'Bloodshed' compiler and the FUCKING shitty MinGW compiler
 - cvar_t->string -> cvar_t->strVal
 
 Fixes
@@ -161,16 +209,16 @@ Cleanups
 
 Features
 - cl_async, toggle asynchronous renderer/network
-- international keyboard support?
-- dinput for mouse/keyboard
-- LSHIFT RSHIFT LCTRL RCTRL LALT RALT
+- RECHECK(SDL2): international keyboard support?
+- OBSOLETE(SDL2): dinput for mouse/keyboard
+- RECHECK(SDL2): LSHIFT RSHIFT LCTRL RCTRL LALT RALT
 - change dedicated server window title on server start; hostname (ip:port)
 - cl_autoDemo -- will record a demo automatically at map start when enabled. mapname-yyyy.mm.dd.hr.mn.dm2 (HELLllloo long name).
 
 Fixes
 - Pasting into console/messages doesn't paste where cursor is, just to end of line...
-- mouse speed increase outside of q2 when you close it/alt-tab?
-  * need dinput to resolve this I bet
+- RECHECK(SDL2): mouse speed increase outside of q2 when you close it/alt-tab?
+  * OBSOLETE(SDL2): need dinput to resolve this I bet
   * actually only seems to happen on a crash
 - bind a say "@L@L@L@L@L@L@L@L@L@L@L@L@L@L@L" and hold the key down, crash! somehow console->totalLines is getting reset?
 
