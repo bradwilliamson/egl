@@ -30,6 +30,7 @@ static qBool sdl_mouseGrabbed = qFalse;
 
 static cVar_t *in_joystick = NULL;
 static cVar_t *in_joystick_auto = NULL;
+static cVar_t *joy_autobind = NULL;
 static cVar_t *joy_deadzone = NULL;
 static cVar_t *joy_move_scale = NULL;
 static cVar_t *joy_look_scale = NULL;
@@ -55,6 +56,9 @@ static qBool sdl_trigger_r_down = qFalse;
 
 static void *cmd_in_restart = NULL;
 static void *cmd_joy_rumble = NULL;
+static void *cmd_joy_bind_defaults = NULL;
+
+static qBool sdl_joy_bind_attempted = qFalse;
 
 static void SDL2_SetGrabState (qBool grab)
 {
@@ -180,6 +184,61 @@ static float SDL2_ApplyDeadzone (float x, float dz)
     return (x > 0.0f ? 1.0f : -1.0f) * ((ax - dz) / (1.0f - dz));
 }
 
+typedef struct sdl2_gamepad_bind_s {
+    keyNum_t key;
+    const char *cmd;
+} sdl2_gamepad_bind_t;
+
+static void SDL2_ApplyDefaultGamepadBinds (qBool force)
+{
+    // A fairly modern, shooter-friendly baseline. Only applied to JOY/AUX keys.
+    static const sdl2_gamepad_bind_t binds[] = {
+        { K_AUX28, "+attack" },
+        { K_AUX27, "+use" },
+
+        { K_JOY1, "+moveup" },
+        { K_JOY2, "+movedown" },
+        { K_JOY3, "invuse" },
+        { K_JOY4, "inven" },
+
+        { K_AUX6, "weapprev" },
+        { K_AUX7, "weapnext" },
+
+        { K_AUX8, "invuse" },
+        { K_AUX9, "invdrop" },
+        { K_AUX10, "invprev" },
+        { K_AUX11, "invnext" },
+
+        { K_AUX1, "score" },
+        { K_AUX4, "centerview" },
+        { K_AUX5, "+speed" },
+    };
+
+    int i;
+    qBool any = qFalse;
+
+    for (i = 0; i < (int)(sizeof (binds) / sizeof (binds[0])); i++) {
+        const char *existing = Key_GetBindingBuf (binds[i].key);
+        if (!force && existing && existing[0])
+            continue;
+        Key_SetBinding (binds[i].key, (char *)binds[i].cmd);
+        any = qTrue;
+    }
+
+    if (any)
+        Com_Printf (0, "Gamepad: default binds applied (use joy_bind_defaults [-force])\n");
+}
+
+static void IN_JoyBindDefaults_f (void)
+{
+    qBool force = qFalse;
+    if (Cmd_Argc () >= 2) {
+        if (!Q_stricmp (Cmd_Argv (1), "force") || !Q_stricmp (Cmd_Argv (1), "-force"))
+            force = qTrue;
+    }
+    SDL2_ApplyDefaultGamepadBinds (force);
+}
+
 static qBool SDL2_OpenFirstController (void)
 {
     int num = SDL_NumJoysticks ();
@@ -200,6 +259,13 @@ static qBool SDL2_OpenFirstController (void)
         sdl_controllerInstance = joy ? SDL_JoystickInstanceID (joy) : -1;
 
         Com_Printf (0, "Gamepad: %s\n", SDL_GameControllerName (sdl_controller));
+
+        // Optional, non-destructive autobind for gamepad players.
+        if (!sdl_joy_bind_attempted) {
+            sdl_joy_bind_attempted = qTrue;
+            if (joy_autobind && joy_autobind->intVal)
+                SDL2_ApplyDefaultGamepadBinds (qFalse);
+        }
         return qTrue;
     }
 
@@ -363,6 +429,14 @@ void SDL2_PollInputEvents (void)
 
             if (!(in_joystick && in_joystick->intVal))
                 break;
+
+            // In menus, treat B/Back as Escape (back).
+            if (Key_GetDest () == KD_MENU) {
+                if (btn == SDL_CONTROLLER_BUTTON_B || btn == SDL_CONTROLLER_BUTTON_BACK) {
+                    Key_Event (K_ESCAPE, down, Sys_Milliseconds ());
+                    break;
+                }
+            }
 
             // Special-case Start as Escape by default, but still allow binds via AUX.
             if (btn == SDL_CONTROLLER_BUTTON_START) {
@@ -538,6 +612,7 @@ void IN_Init (void)
     // Keep legacy CVAR name so existing menus/scripts work.
     in_joystick = Cvar_Register ("in_joystick", "0", CVAR_ARCHIVE);
     in_joystick_auto = Cvar_Register ("in_joystick_auto", "0", CVAR_ARCHIVE);
+    joy_autobind = Cvar_Register ("joy_autobind", "1", CVAR_ARCHIVE);
     joy_deadzone = Cvar_Register ("joy_deadzone", "0.15", CVAR_ARCHIVE);
     joy_move_scale = Cvar_Register ("joy_move_scale", "1.0", CVAR_ARCHIVE);
     joy_look_scale = Cvar_Register ("joy_look_scale", "700", CVAR_ARCHIVE);
@@ -550,6 +625,9 @@ void IN_Init (void)
     if (!cmd_joy_rumble)
         cmd_joy_rumble = Cmd_AddCommand ("joy_rumble", IN_Rumble_f, "Test gamepad rumble: joy_rumble <low 0-65535> <high 0-65535> <ms>");
 
+    if (!cmd_joy_bind_defaults)
+        cmd_joy_bind_defaults = Cmd_AddCommand ("joy_bind_defaults", IN_JoyBindDefaults_f, "Apply default gamepad binds (won't override existing binds unless -force)");
+
     if (SDL2_WantsController ()) {
         if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
             Cvar_VariableSetValue (in_joystick, 1, qFalse);
@@ -561,6 +639,11 @@ void IN_Shutdown (void)
     SDL2_SetGrabState (qFalse);
 
     SDL2_CloseController ();
+
+    if (cmd_joy_bind_defaults) {
+        Cmd_RemoveCommand ("joy_bind_defaults", cmd_joy_bind_defaults);
+        cmd_joy_bind_defaults = NULL;
+    }
 
     if (cmd_joy_rumble) {
         Cmd_RemoveCommand ("joy_rumble", cmd_joy_rumble);
