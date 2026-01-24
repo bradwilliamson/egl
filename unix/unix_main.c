@@ -222,6 +222,17 @@ int glob_match (char *pattern, char *text)
 
 // ========================================
 
+static char sys_defaultBaseDir[MAX_OSPATH] = { 0 };
+
+char *Sys_DefaultBaseDir (void)
+{
+	if (sys_defaultBaseDir[0])
+		return sys_defaultBaseDir;
+	if (getcwd (sys_defaultBaseDir, sizeof (sys_defaultBaseDir)) != NULL)
+		return sys_defaultBaseDir;
+	return ".";
+}
+
 
 /*
 ================
@@ -242,6 +253,8 @@ Sys_Init
 */
 void Sys_Init (void)
 {
+	// Cache default base directory early.
+	Sys_DefaultBaseDir ();
 }
 
 

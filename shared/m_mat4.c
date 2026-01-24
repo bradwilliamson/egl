@@ -351,3 +351,27 @@ void Matrix4_Transpose (mat4x4_t m, mat4x4_t ret)
 	ret[8 ] = m[2]; ret[9 ] = m[6]; ret[10] = m[10]; ret[11] = m[14];
 	ret[12] = m[3]; ret[13] = m[7]; ret[14] = m[11]; ret[15] = m[15];
 }
+
+/*
+===============
+Matrix4_Invert
+
+Fast inverse for affine matrices that are a rotation + translation.
+===============
+*/
+void Matrix4_Invert (mat4x4_t src, mat4x4_t dst)
+{
+	vec3_t origin = { src[12], src[13], src[14] };
+	mat3x3_t rot;
+	mat3x3_t rot_t;
+	mat4x4_t tmp;
+	vec3_t inv_origin;
+
+	Matrix4_Matrix3 (src, rot);
+	Matrix3_Transpose (rot, rot_t);
+	Matrix3_Matrix4 (rot_t, vec3Origin, tmp);
+	Matrix3_TransformVector (rot_t, origin, inv_origin);
+	Vec3Negate (inv_origin, inv_origin);
+	Matrix4_Translate (tmp, inv_origin[0], inv_origin[1], inv_origin[2]);
+	Matrix4_Copy (tmp, dst);
+}

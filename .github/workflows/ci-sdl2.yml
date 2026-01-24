@@ -40,6 +40,11 @@ jobs:
             exit 2
           fi
 
+      - name: Build and run unit tests
+        run: |
+          set -o pipefail
+          make -C tests ci 2>&1 | tee tests/test-output.log
+
       - name: Show build log (tail)
         if: always()
         run: |
@@ -91,6 +96,8 @@ jobs:
             ci/compile_smoke.log
             ci/vulkan_smoke
             ci/compile_vulkan_smoke.log
+            tests/*.log
+            tests/test-output.log
 
   build-sdl2-windows:
     runs-on: windows-latest
@@ -120,15 +127,46 @@ jobs:
             mingw-w64-x86_64-zlib
             mingw-w64-x86_64-minizip
 
+      - name: Ensure SDL2 runtime is present (Windows)
+        run: |
+          set -e
+          pacman -S --noconfirm --needed mingw-w64-x86_64-SDL2
+          if [ ! -f /mingw64/bin/SDL2.dll ]; then
+            echo "ERROR: /mingw64/bin/SDL2.dll is missing"
+            pacman -Qi mingw-w64-x86_64-SDL2 || true
+            ls -la /mingw64/bin | sed -n '1,200p' || true
+            exit 2
+          fi
+          ls -la /mingw64/bin/SDL2.dll
+
       - name: Build project (Windows, SDL2)
         run: |
           set -o pipefail
           echo "MSYSTEM=$MSYSTEM"
+          echo "MSYSTEM_PREFIX=$MSYSTEM_PREFIX"
+          export EGL_MSYS2_ROOT="$(cygpath -w /)"
+          export EGL_MSYS2_PREFIX="$(basename "$MSYSTEM_PREFIX")"
+          echo "Using SDL2 from: $MSYSTEM_PREFIX/bin/SDL2.dll"
+          ls -la "$MSYSTEM_PREFIX/bin/SDL2.dll"
           echo "gcc --version:"; gcc --version || true
           echo "make --version:"; make --version || true
           make clean
           make USE_SDL2=1 2>&1 | tee build-win.log
           make dedicated USE_SDL2=1 2>&1 | tee -a build-win.log
+
+      - name: Build and run unit tests (Windows)
+        run: |
+          set -o pipefail
+          export PATH="$MSYSTEM_PREFIX/bin:$PATH"
+          export MSYSTEM_PREFIX="$MSYSTEM_PREFIX"
+          if [ ! -f "$MSYSTEM_PREFIX/bin/SDL2.dll" ]; then
+            echo "ERROR: SDL2.dll missing in $MSYSTEM_PREFIX/bin"
+            ls -la "$MSYSTEM_PREFIX/bin" | sed -n '1,200p' || true
+            exit 2
+          fi
+          echo "MSYSTEM_PREFIX=$MSYSTEM_PREFIX"
+          echo "PATH=$PATH"
+          make -C tests ci 2>&1 | tee tests/test-output.log
 
       - name: Compile Vulkan smoke test (Windows)
         run: |
@@ -146,3 +184,5 @@ jobs:
             build-win.log
             compile-vulkan-smoke-win.log
             ci/vulkan_smoke.o
+            tests/*.log
+            tests/test-output.log

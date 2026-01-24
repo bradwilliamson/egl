@@ -606,6 +606,9 @@ void rocket_touch (edict_t *ent, edict_t *other, cBspPlane_t *plane, cBspSurface
 
 	T_RadiusDamage(ent, ent->owner, ent->radius_dmg, other, ent->dmg_radius, MOD_R_SPLASH);
 
+	if (ent->owner && ent->owner->client)
+		gi.AddCommandString("joy_rumble 25000 25000 300\n");
+
 	gi.WriteByte (SVC_TEMP_ENTITY);
 	if (ent->waterlevel)
 		gi.WriteByte (TE_ROCKET_EXPLOSION_WATER);
@@ -782,6 +785,9 @@ void bfg_touch (edict_t *self, edict_t *other, cBspPlane_t *plane, cBspSurface_t
 	if (other->takedamage)
 		T_Damage (other, self, self->owner, self->velocity, self->s.origin, plane->normal, 200, 0, 0, MOD_BFG_BLAST);
 	T_RadiusDamage(self, self->owner, 200, other, 100, MOD_BFG_BLAST);
+
+	if (self->owner && self->owner->client)
+		gi.AddCommandString("joy_rumble 30000 30000 400\n");
 
 	gi.sound (self, CHAN_VOICE, gi.soundindex ("weapons/bfg__x1b.wav"), 1, ATTN_NORM, 0);
 	self->solid = SOLID_NOT;

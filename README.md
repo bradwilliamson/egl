@@ -1,6 +1,6 @@
 # EGL, an enhanced Quake II Engine
 Originally written by Echon.
-A backup of EGL 0.3.2, modernized from the original 0.3.1 QuakeSrc snapshot (circa 2007).
+A backup of EGL 0.3.3, modernized from the original 0.3.1 QuakeSrc snapshot (circa 2007).
 
 ## Modernization status
 
@@ -63,6 +63,12 @@ You still need to provide your legally-obtained Quake II data (at minimum `pak0.
 
 GitHub Actions runs an SDL2 build on Linux and Windows (MSYS2/MinGW64) in `.github/workflows/ci-sdl2.yml`.
 The workflow also compiles a small Vulkan smoke test (compile/link on Linux; compile-only on Windows).
+
+Unit tests run in the same workflow. Locally:
+
+`make -C tests ci`
+
+See `tests/README.md` for details.
 
 ## Building on Linux (Ubuntu / openSUSE)
 

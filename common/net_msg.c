@@ -118,10 +118,16 @@ void MSG_WriteByte (netMsg_t *dest, int c)
 {
 	byte	*buf;
 
-	assert (!(c < 0 || c > 255));
+	if (c < 0 || c > 255) {
+		Com_Printf (PRNT_WARNING, "MSG_WriteByte: value %d out of range (0..255), clamping\n", c);
+		if (c < 0)
+			c = 0;
+		else if (c > 255)
+			c = 255;
+	}
 
 	buf = MSG_GetWriteSpace (dest, 1);
-	buf[0] = c;
+	buf[0] = (byte)c;
 }
 
 

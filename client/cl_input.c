@@ -38,6 +38,10 @@ static cVar_t	*cl_anglespeedkey;
 static cVar_t	*cl_run;
 static cVar_t	*m_filter;
 
+static cVar_t	*_zoomfov;
+static qBool	cl_zoomActive;
+static float	cl_zoomSavedFov;
+
 static uint32	in_frameTime;
 static uint32	in_lastFrameTime;
 static uint32	in_frameMSec;
@@ -54,6 +58,42 @@ IN_CenterView_f
 static void IN_CenterView_f (void)
 {
 	cl.viewAngles[PITCH] = -SHORT2ANGLE (cl.frame.playerState.pMove.deltaAngles[PITCH]);
+}
+
+/*
+============
+IN_ZoomDown_f / IN_ZoomUp_f
+
+Classic Quake-style hold-to-zoom: temporarily reduces the userinfo "fov" to
+_zoomfov and restores it on release.
+
+This is intentionally *not* aim assist: it only changes the field of view.
+============
+*/
+static void IN_ZoomDown_f (void)
+{
+	float target;
+
+	if (cl_zoomActive)
+		return;
+
+	cl_zoomSavedFov = Cvar_GetFloatValue ("fov");
+	target = _zoomfov ? _zoomfov->floatVal : Cvar_GetFloatValue ("_zoomfov");
+	if (target <= 0.0f)
+		target = 45.0f;
+	target = clamp (target, 1.0f, 179.0f);
+
+	Cvar_SetValue ("fov", target, qFalse);
+	cl_zoomActive = qTrue;
+}
+
+static void IN_ZoomUp_f (void)
+{
+	if (!cl_zoomActive)
+		return;
+
+	Cvar_SetValue ("fov", clamp (cl_zoomSavedFov, 1.0f, 179.0f), qFalse);
+	cl_zoomActive = qFalse;
 }
 
 /*
@@ -709,6 +749,9 @@ void CL_InputInit (void)
 	// Cvars
 	autosensitivity		= Cvar_Register ("autosensitivity",		"0",		CVAR_ARCHIVE);
 
+	// Hold-to-zoom target FOV.
+	_zoomfov			= Cvar_Register ("_zoomfov",			"45",		CVAR_ARCHIVE);
+
 	cl_nodelta			= Cvar_Register ("cl_nodelta",			"0",		0);
 
 	cl_upspeed			= Cvar_Register ("cl_upspeed",			"200",		0);
@@ -725,6 +768,9 @@ void CL_InputInit (void)
 
 	// Commands
 	Cmd_AddCommand ("centerview",	IN_CenterView_f,	"Centers the view");
+
+	Cmd_AddCommand ("+zoom",		IN_ZoomDown_f,		"Hold to zoom (sets fov to _zoomfov)");
+	Cmd_AddCommand ("-zoom",		IN_ZoomUp_f,		"Release zoom (restores fov)");
 
 	Cmd_AddCommand ("+moveup",		IN_UpDown_f,		"");
 	Cmd_AddCommand ("-moveup",		IN_UpUp_f,			"");

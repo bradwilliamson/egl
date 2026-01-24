@@ -61,7 +61,9 @@ static void StartGame (void)
 
 	cgi.Cvar_SetValue ("gamerules", 0, qFalse);
 
-	cgi.Cbuf_AddText ("killserver ; wait ; newgame\n");
+	// Start the vanilla Quake II campaign.
+	// Some builds don't register a separate `newgame` command; `map base1` is the canonical entry.
+	cgi.Cbuf_AddText ("killserver ; wait ; map base1\n");
 	cgi.Key_SetDest (KD_GAME);
 }
 

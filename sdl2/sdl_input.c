@@ -16,6 +16,8 @@ should be implemented later.
 #  include <SDL2/SDL.h>
 #endif
 
+#include <math.h>
+
 /* From sdl_glimp.c */
 extern cVar_t *vid_fullscreen;
 
@@ -26,7 +28,43 @@ void GLimp_AppActivate (qBool active);
 static qBool sdl_appActive = qTrue;
 static qBool sdl_mouseGrabbed = qFalse;
 
+static cVar_t *in_joystick = NULL;
+static cVar_t *in_joystick_auto = NULL;
+static cVar_t *joy_autobind = NULL;
+static cVar_t *joy_deadzone = NULL;
+static cVar_t *joy_move_scale = NULL;
+static cVar_t *joy_look_scale = NULL;
+static cVar_t *joy_invert_y = NULL;
+static cVar_t *joy_trigger_threshold = NULL;
+static cVar_t *joy_rumble_enable = NULL;
+static cVar_t *joy_haptic_magnitude = NULL;
+static cVar_t *joy_haptic_distance = NULL;
+
+static SDL_GameController *sdl_controller = NULL;
+static SDL_JoystickID sdl_controllerInstance = -1;
+static SDL_Haptic *sdl_haptic = NULL;
+static qBool sdl_has_gc_rumble = qFalse;
+
+static int sdl_joy_left_x = 0;
+static int sdl_joy_left_y = 0;
+static int sdl_joy_right_x = 0;
+static int sdl_joy_right_y = 0;
+static int sdl_joy_trigger_l = 0;
+static int sdl_joy_trigger_r = 0;
+
+static qBool sdl_menu_left = qFalse;
+static qBool sdl_menu_right = qFalse;
+static qBool sdl_menu_up = qFalse;
+static qBool sdl_menu_down = qFalse;
+static qBool sdl_trigger_l_down = qFalse;
+static qBool sdl_trigger_r_down = qFalse;
+
 static void *cmd_in_restart = NULL;
+static void *cmd_joy_rumble = NULL;
+static void *cmd_joy_bind_defaults = NULL;
+static void *cmd_joy_unbindall = NULL;
+
+static qBool sdl_joy_bind_attempted = qFalse;
 
 static void SDL2_SetGrabState (qBool grab)
 {
@@ -118,10 +156,445 @@ static keyNum_t SDL2_TranslateMouseButton (Uint8 button)
     }
 }
 
+static keyNum_t SDL2_TranslateControllerButton (Uint8 button)
+{
+    int b = (int)button;
+    if (b < 0)
+        return K_BADKEY;
+
+    if (b < 4)
+        return (keyNum_t)(K_JOY1 + b);
+
+    b -= 4;
+    if (b >= 0 && b < 28)
+        return (keyNum_t)(K_AUX1 + b);
+
+    return K_BADKEY;
+}
+
+static void SDL2_VirtualKeyEvent (keyNum_t key, qBool *state, qBool down)
+{
+    if (*state == down)
+        return;
+    *state = down;
+    Key_Event ((int)key, down, Sys_Milliseconds ());
+}
+
+static float SDL2_ApplyDeadzone (float x, float dz)
+{
+    float ax = fabsf (x);
+    if (ax <= dz)
+        return 0.0f;
+    if (dz >= 0.999f)
+        return 0.0f;
+    return (x > 0.0f ? 1.0f : -1.0f) * ((ax - dz) / (1.0f - dz));
+}
+
+typedef struct sdl2_gamepad_bind_s {
+    keyNum_t key;
+    const char *cmd;
+} sdl2_gamepad_bind_t;
+
+static void SDL2_ApplyDefaultGamepadBinds (qBool force, qBool zoomPreset)
+{
+    // A fairly modern, shooter-friendly baseline. Only applied to JOY/AUX keys.
+    static const sdl2_gamepad_bind_t binds_default[] = {
+        // Triggers
+        { K_AUX28, "+attack" },
+        { K_AUX27, "+use" },
+
+        // Face buttons
+        { K_JOY1, "+moveup" },
+        { K_JOY2, "+movedown" },
+        { K_JOY3, "invuse" },
+        { K_JOY4, "inven" },
+
+        // Bumpers
+        { K_AUX6, "weapprev" },
+        { K_AUX7, "weapnext" },
+
+        // D-pad
+        { K_AUX8, "invuse" },
+        { K_AUX9, "invdrop" },
+        { K_AUX10, "invprev" },
+        { K_AUX11, "invnext" },
+
+        // Misc
+        { K_AUX1, "score" },
+        { K_AUX4, "centerview" },
+        { K_AUX5, "+speed" },
+    };
+
+    // Alternate, Fortnite-adjacent preset: LT acts as hold-to-zoom.
+    // Keep +use reachable on a face button (X/Square).
+    static const sdl2_gamepad_bind_t binds_zoom[] = {
+        // Triggers
+        { K_AUX28, "+attack" },
+        { K_AUX27, "+zoom" },
+
+        // Face buttons
+        { K_JOY1, "+moveup" },
+        { K_JOY2, "+movedown" },
+        { K_JOY3, "+use" },
+        { K_JOY4, "inven" },
+
+        // Bumpers
+        { K_AUX6, "weapprev" },
+        { K_AUX7, "weapnext" },
+
+        // D-pad
+        { K_AUX8, "invuse" },
+        { K_AUX9, "invdrop" },
+        { K_AUX10, "invprev" },
+        { K_AUX11, "invnext" },
+
+        // Misc
+        { K_AUX1, "score" },
+        { K_AUX4, "centerview" },
+        { K_AUX5, "+speed" },
+    };
+
+    const sdl2_gamepad_bind_t *binds = zoomPreset ? binds_zoom : binds_default;
+    int bindCount = zoomPreset ? (int)(sizeof (binds_zoom) / sizeof (binds_zoom[0]))
+                               : (int)(sizeof (binds_default) / sizeof (binds_default[0]));
+
+    int i;
+    qBool any = qFalse;
+
+    for (i = 0; i < bindCount; i++) {
+        const char *existing = Key_GetBindingBuf (binds[i].key);
+        if (!force && existing && existing[0])
+            continue;
+        Key_SetBinding (binds[i].key, (char *)binds[i].cmd);
+        any = qTrue;
+    }
+
+    if (any) {
+        if (zoomPreset)
+            Com_Printf (0, "Gamepad: default binds applied (LT=zoom; use joy_bind_defaults [-force] [-zoom])\n");
+        else
+            Com_Printf (0, "Gamepad: default binds applied (use joy_bind_defaults [-force] [-zoom])\n");
+    }
+}
+
+static void IN_JoyBindDefaults_f (void)
+{
+    qBool force = qFalse;
+    qBool zoomPreset = qFalse;
+    int i;
+
+    for (i = 1; i < Cmd_Argc (); i++) {
+        const char *a = Cmd_Argv (i);
+        if (!a || !a[0])
+            continue;
+        if (!Q_stricmp (a, "force") || !Q_stricmp (a, "-force"))
+            force = qTrue;
+        else if (!Q_stricmp (a, "zoom") || !Q_stricmp (a, "-zoom"))
+            zoomPreset = qTrue;
+    }
+
+    SDL2_ApplyDefaultGamepadBinds (force, zoomPreset);
+}
+
+static void IN_JoyUnbindAll_f (void)
+{
+    int k;
+
+    for (k = K_JOY1; k <= K_JOY4; k++)
+        Key_SetBinding ((keyNum_t)k, "");
+
+    for (k = K_AUX1; k <= K_AUX32; k++)
+        Key_SetBinding ((keyNum_t)k, "");
+
+    Com_Printf (0, "Gamepad: cleared JOY/AUX bindings (keyboard/mouse untouched)\n");
+}
+
+static qBool SDL2_OpenFirstController (void)
+{
+    int num = SDL_NumJoysticks ();
+    int i;
+
+    if (sdl_controller)
+        return qTrue;
+
+    for (i = 0; i < num; i++) {
+        if (!SDL_IsGameController (i))
+            continue;
+
+        sdl_controller = SDL_GameControllerOpen (i);
+        if (!sdl_controller)
+            continue;
+
+        SDL_Joystick *joy = SDL_GameControllerGetJoystick (sdl_controller);
+        sdl_controllerInstance = joy ? SDL_JoystickInstanceID (joy) : -1;
+
+        sdl_has_gc_rumble = qFalse;
+        sdl_haptic = NULL;
+
+        // 1. Try to open Haptic device from Joystick for fallback or advanced effects
+        if (joy) {
+            sdl_haptic = SDL_HapticOpenFromJoystick (joy);
+            if (sdl_haptic) {
+                // Initialize simple rumble support on the haptic device
+                if (SDL_HapticRumbleInit (sdl_haptic) != 0) {
+                    Com_Printf (0, "Gamepad: HapticRumbleInit failed: %s\n", SDL_GetError());
+                    SDL_HapticClose (sdl_haptic);
+                    sdl_haptic = NULL;
+                } else {
+                    Com_Printf (0, "Gamepad: Haptic subsystem initialized (fallback)\n");
+                }
+            }
+        }
+
+        // 2. Check for native GameController rumble support (preferred)
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+        if (SDL_GameControllerHasRumble (sdl_controller)) {
+            sdl_has_gc_rumble = qTrue;
+            Com_Printf (0, "Gamepad: Native Rumble support detected\n");
+        }
+#elif SDL_VERSION_ATLEAST(2, 0, 9)
+        // Heuristic: Try a zero-magnitude rumble. If it returns 0 (success), it's supported.
+        if (SDL_GameControllerRumble (sdl_controller, 0, 0, 0) == 0) {
+            sdl_has_gc_rumble = qTrue;
+            Com_Printf (0, "Gamepad: Native Rumble support detected (via heuristic)\n");
+        }
+#endif
+
+        // If neither is available, warn user
+        if (!sdl_has_gc_rumble && !sdl_haptic) {
+            Com_Printf (0, "Gamepad: No rumble/haptic support found for this controller.\n");
+        }
+
+        Com_Printf (0, "Gamepad: %s\n", SDL_GameControllerName (sdl_controller));
+
+        // Optional, non-destructive autobind for gamepad players.
+        if (!sdl_joy_bind_attempted) {
+            sdl_joy_bind_attempted = qTrue;
+            if (joy_autobind && joy_autobind->intVal)
+                SDL2_ApplyDefaultGamepadBinds (qFalse, qFalse);
+        }
+        return qTrue;
+    }
+
+    return qFalse;
+}
+
+static void SDL2_CloseController (void)
+{
+    if (sdl_haptic) {
+        SDL_HapticClose (sdl_haptic);
+        sdl_haptic = NULL;
+    }
+
+    if (sdl_controller) {
+        SDL_GameControllerClose (sdl_controller);
+        sdl_controller = NULL;
+    }
+    sdl_controllerInstance = -1;
+    sdl_has_gc_rumble = qFalse;
+
+    sdl_joy_left_x = sdl_joy_left_y = 0;
+    sdl_joy_right_x = sdl_joy_right_y = 0;
+    sdl_joy_trigger_l = sdl_joy_trigger_r = 0;
+
+    sdl_menu_left = sdl_menu_right = qFalse;
+    sdl_menu_up = sdl_menu_down = qFalse;
+    sdl_trigger_l_down = sdl_trigger_r_down = qFalse;
+}
+
+static void SDL2_UpdateControllerEnabled (void)
+{
+    if (!in_joystick)
+        return;
+
+    if (in_joystick->modified) {
+        in_joystick->modified = qFalse;
+
+        if (in_joystick->intVal) {
+            SDL2_OpenFirstController ();
+        }
+        else {
+            SDL2_CloseController ();
+        }
+    }
+}
+
+static qBool SDL2_WantsController (void)
+{
+    if (in_joystick && in_joystick->intVal)
+        return qTrue;
+    if (in_joystick_auto && in_joystick_auto->intVal)
+        return qTrue;
+    return qFalse;
+}
+
+static void IN_DoRumble (int low, int high, int ms)
+{
+    // Prevent spamming "failed" messages if we already know it fails
+    static qBool rumble_fail_warned = qFalse;
+
+    if (!sdl_controller || !joy_rumble_enable || !joy_rumble_enable->intVal)
+        return;
+    
+    // Safety caps
+    if (low < 0) low = 0; if (low > 65535) low = 65535;
+    if (high < 0) high = 0; if (high > 65535) high = 65535;
+    if (ms < 0) ms = 0; if (ms > 5000) ms = 5000;
+
+    // 1. Try Native GameController Rumble
+    if (sdl_has_gc_rumble) {
+        if (SDL_GameControllerRumble (sdl_controller, (Uint16)low, (Uint16)high, (Uint32)ms) == 0) {
+            return; // Success
+        }
+    }
+
+    // 2. Fallback: Haptic Subsystem
+    if (sdl_haptic) {
+        // HapticRumblePlay takes float 0.0-1.0 intensity
+        // We pick the stronger of the two motors as the single haptic strength
+        float strength = (float)(low > high ? low : high) / 65535.0f;
+        if (strength > 1.0f) strength = 1.0f;
+
+        if (SDL_HapticRumblePlay (sdl_haptic, strength, (Uint32)ms) == 0) {
+            return; // Success
+        }
+    }
+
+    // 3. Failure
+    if (!rumble_fail_warned) {
+        Com_Printf (PRNT_WARNING, "Gamepad rumble failed: %s\n", SDL_GetError ());
+        rumble_fail_warned = qTrue;
+    }
+}
+
+static void IN_Rumble_f (void)
+{
+    if (!joy_rumble_enable || !joy_rumble_enable->intVal)
+        return;
+
+    int low = 0, high = 0, ms = 200;
+
+    if (!sdl_controller) {
+        return;
+    }
+
+    if (Cmd_Argc () >= 2)
+        low = atoi (Cmd_Argv (1));
+    if (Cmd_Argc () >= 3)
+        high = atoi (Cmd_Argv (2));
+    if (Cmd_Argc () >= 4)
+        ms = atoi (Cmd_Argv (3));
+
+    IN_DoRumble (low, high, ms);
+}
+
+// Public API for client to trigger rumble events
+void IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float volume)
+{
+    float intens = 0.0f;
+    float low_freq = 1.0f, hi_freq = 1.0f;
+    float dist_prop = 1.0f;
+    float max_distance = joy_haptic_distance->floatVal;
+    int duration = 0;
+    qBool from_player = (entNum == cl.playerNum + 1);
+
+    if (!sdl_controller || !joy_rumble_enable || !joy_rumble_enable->intVal)
+        return;
+
+    if (volume <= 0.0f)
+        return;
+
+    if (!name)
+        return;
+
+    // Distance attenuation
+    if (origin && !from_player) {
+         vec3_t sub;
+         Vec3Subtract (origin, cl.refDef.viewOrigin, sub);
+         float dist = Vec3Length(sub);
+         if (dist > max_distance)
+             return;
+         dist_prop = (max_distance - dist) / max_distance;
+    }
+
+    // Logic adapted from yquake2 Controller_Rumble
+    if (strstr(name, "weapons/"))
+    {
+        intens = 1.0f; // Baseline for weapons
+        duration = 160;
+        
+        // Weapon specifics (approximations based on name)
+        if (strstr(name, "hyprbf1")) { intens = 0.5f; } // Hyperblaster
+        else if (strstr(name, "machgf")) { intens = 0.5f; } // Machinegun
+        else if (strstr(name, "chain")) { intens = 0.6f; } // Chaingun
+        else if (strstr(name, "rocklf")) { intens = 1.0f; duration = 250; low_freq = 1.5f; hi_freq = 0.8f; } // Rocket Launcher
+        else if (strstr(name, "grenlf")) { intens = 1.0f; duration = 250; low_freq = 1.5f; hi_freq = 0.8f; } // Grenade Launcher
+        else if (strstr(name, "railgf1")) { intens = 1.0f; duration = 300; low_freq = 2.0f; hi_freq = 2.0f; } // Railgun
+        else if (strstr(name, "bfg")) { intens = 1.0f; duration = 500; low_freq = 3.0f; hi_freq = 3.0f; } // BFG
+        else if (strstr(name, "shotgf")) { intens = 0.8f; duration = 200; } // Shotgun
+        else if (strstr(name, "blastf")) { intens = 0.6f; } // Blaster
+    }
+    else if (strstr(name, "player/") || strstr(name, "players/"))
+    {
+        // Player damage/pain/fall
+        if (strstr(name, "fall") || strstr(name, "pain")) {
+           intens = 1.0f; duration = 250; low_freq = 2.0f; hi_freq = 1.5f;
+        } else if (strstr(name, "death")) {
+            intens = 1.0f; duration = 800; low_freq = 3.0f; hi_freq = 3.0f;
+        } else if (strstr(name, "land")) {
+            intens = 0.3f; duration = 150; 
+        } else if (strstr(name, "jump")) {
+             intens = 0.1f; duration = 100;
+        }
+    }
+    else if (strstr(name, "items/")) {
+        intens = 0.4f; duration = 150;
+        
+        if (strstr(name, "damage") || strstr(name, "protect") || strstr(name, "quad")) { 
+             // Quad/Invuln/Powerups
+             intens = 1.0f; duration = 400; low_freq = 2.0f; hi_freq = 2.0f;
+        } else if (strstr(name, "health") || strstr(name, "mega")) {
+             intens = 0.5f; 
+             if (strstr(name, "mega") || strstr(name, "l_health")) intens = 0.7f;
+        }
+    }
+    else if (strstr(name, "misc/") || strstr(name, "pickups/")) { 
+         // Additional pickup sounds often in misc
+         if (strstr(name, "w_pkup") || strstr(name, "am_pkup")) {
+             intens = 0.4f; duration = 120;
+         }
+    }
+    else if (strstr(name, "world/")) {
+        // World effects (quake, explosions)
+        if (strstr(name, "quake") || strstr(name, "rumble")) {
+             intens = 0.5f; duration = 500; low_freq = 1.5f;
+        } else if (strstr(name, "explod")) {
+             intens = 0.8f; duration = 400; low_freq = 2.0f; hi_freq = 1.5f;
+        }
+    }
+
+    if (intens <= 0.0f)
+        return;
+
+    // Apply modifiers
+    float mag = joy_haptic_magnitude->floatVal;
+    if (mag <= 0.0f) mag = 1.0f; // Default if not set properly
+
+    int final_low = (int)(65535.0f * intens * low_freq * mag * dist_prop * volume);
+    int final_high = (int)(65535.0f * intens * hi_freq * mag * dist_prop * volume);
+
+    if (final_low == 0 && final_high == 0)
+        return;
+
+    IN_DoRumble(final_low, final_high, duration);
+}
+
 /* Poll SDL2 events and forward into engine */
 void SDL2_PollInputEvents (void)
 {
     SDL_Event ev;
+    SDL2_UpdateControllerEnabled ();
+
     while (SDL_PollEvent (&ev)) {
         switch (ev.type) {
         case SDL_QUIT:
@@ -178,6 +651,93 @@ void SDL2_PollInputEvents (void)
             else if (ev.wheel.y < 0) { Key_Event (K_MWHEELDOWN, qTrue, Sys_Milliseconds ()); Key_Event (K_MWHEELDOWN, qFalse, Sys_Milliseconds ()); }
             break;
 
+        case SDL_CONTROLLERDEVICEADDED:
+            if (SDL2_WantsController ()) {
+                if (!sdl_controller) {
+                    if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
+                        Cvar_VariableSetValue (in_joystick, 1, qFalse);
+                }
+            }
+            break;
+
+        case SDL_CONTROLLERDEVICEREMOVED:
+            if (sdl_controller && ev.cdevice.which == sdl_controllerInstance) {
+                Com_Printf (0, "Gamepad disconnected.\n");
+                SDL2_CloseController ();
+            }
+            break;
+
+        case SDL_CONTROLLERBUTTONDOWN:
+        case SDL_CONTROLLERBUTTONUP:
+        {
+            qBool down = (ev.type == SDL_CONTROLLERBUTTONDOWN) ? qTrue : qFalse;
+            Uint8 btn = ev.cbutton.button;
+
+            if (!(in_joystick && in_joystick->intVal))
+                break;
+
+            // In menus, treat B/Back as Escape (back).
+            if (Key_GetDest () == KD_MENU) {
+                if (btn == SDL_CONTROLLER_BUTTON_B || btn == SDL_CONTROLLER_BUTTON_BACK) {
+                    Key_Event (K_ESCAPE, down, Sys_Milliseconds ());
+                    break;
+                }
+            }
+
+            // Special-case Start as Escape by default, but still allow binds via AUX.
+            if (btn == SDL_CONTROLLER_BUTTON_START) {
+                Key_Event (K_ESCAPE, down, Sys_Milliseconds ());
+            }
+
+            keyNum_t k = SDL2_TranslateControllerButton (btn);
+            if (k != K_BADKEY)
+                Key_Event ((int)k, down, Sys_Milliseconds ());
+            break;
+        }
+
+        case SDL_CONTROLLERAXISMOTION:
+        {
+            int axis_value = (int)ev.caxis.value;
+            float trig_thresh = 16384.0f;
+
+            if (!(in_joystick && in_joystick->intVal))
+                break;
+
+            if (joy_trigger_threshold)
+                trig_thresh = 32766.0f * clamp (joy_trigger_threshold->floatVal, 0.001f, 1.0f);
+
+            switch (ev.caxis.axis) {
+            case SDL_CONTROLLER_AXIS_LEFTX: sdl_joy_left_x = axis_value; break;
+            case SDL_CONTROLLER_AXIS_LEFTY: sdl_joy_left_y = axis_value; break;
+            case SDL_CONTROLLER_AXIS_RIGHTX: sdl_joy_right_x = axis_value; break;
+            case SDL_CONTROLLER_AXIS_RIGHTY: sdl_joy_right_y = axis_value; break;
+            case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
+                sdl_joy_trigger_l = axis_value;
+                SDL2_VirtualKeyEvent (K_AUX27, &sdl_trigger_l_down, (axis_value > trig_thresh) ? qTrue : qFalse);
+                break;
+            case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
+                sdl_joy_trigger_r = axis_value;
+                SDL2_VirtualKeyEvent (K_AUX28, &sdl_trigger_r_down, (axis_value > trig_thresh) ? qTrue : qFalse);
+                break;
+            default:
+                break;
+            }
+
+            // Virtual keys to navigate menus with left stick.
+            if (Key_GetDest () == KD_MENU) {
+                const int thresh = 16896;
+                if (ev.caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) {
+                    SDL2_VirtualKeyEvent (K_LEFTARROW, &sdl_menu_left, (axis_value < -thresh) ? qTrue : qFalse);
+                    SDL2_VirtualKeyEvent (K_RIGHTARROW, &sdl_menu_right, (axis_value > thresh) ? qTrue : qFalse);
+                }
+                else if (ev.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
+                    SDL2_VirtualKeyEvent (K_UPARROW, &sdl_menu_up, (axis_value < -thresh) ? qTrue : qFalse);
+                    SDL2_VirtualKeyEvent (K_DOWNARROW, &sdl_menu_down, (axis_value > thresh) ? qTrue : qFalse);
+                }
+            }
+            break;
+        }
+
         case SDL_WINDOWEVENT:
             switch (ev.window.event) {
             case SDL_WINDOWEVENT_RESIZED:
@@ -213,7 +773,50 @@ void IN_Commands (void)
 
 void IN_Move (userCmd_t *cmd)
 {
-    /* Nothing special to do here; SDL sends relative motion via events */
+    float dz, moveScale, lookScale, dt;
+    float lx, ly, rx, ry;
+    int dx, dy;
+
+    if (!cmd)
+        return;
+
+    if (!(in_joystick && in_joystick->intVal))
+        return;
+
+    if (!sdl_controller)
+        return;
+
+    if (!cls.refreshPrepped || !sdl_appActive)
+        return;
+
+    if (Key_GetDest () != KD_GAME)
+        return;
+
+    dz = joy_deadzone ? clamp (joy_deadzone->floatVal, 0.0f, 0.95f) : 0.15f;
+    moveScale = joy_move_scale ? joy_move_scale->floatVal : 1.0f;
+    lookScale = joy_look_scale ? joy_look_scale->floatVal : 700.0f; // "mouse counts" per second at full deflection
+
+    dt = cls.netFrameTime;
+    if (dt <= 0.0f || dt > 0.25f)
+        dt = 0.016f;
+
+    lx = SDL2_ApplyDeadzone ((float)sdl_joy_left_x / 32767.0f, dz);
+    ly = SDL2_ApplyDeadzone ((float)sdl_joy_left_y / 32767.0f, dz);
+    rx = SDL2_ApplyDeadzone ((float)sdl_joy_right_x / 32767.0f, dz);
+    ry = SDL2_ApplyDeadzone ((float)sdl_joy_right_y / 32767.0f, dz);
+
+    // Left stick: movement
+    cmd->sideMove += (int16)(cl_sidespeed->floatVal * moveScale * lx);
+    cmd->forwardMove += (int16)(cl_forwardspeed->floatVal * moveScale * -ly);
+
+    // Right stick: look (feed into mouse path so existing sensitivity/freelook/strafe logic applies)
+    if (joy_invert_y && joy_invert_y->intVal)
+        ry = -ry;
+
+    dx = (int)(rx * lookScale * dt);
+    dy = (int)(ry * lookScale * dt);
+    if (dx || dy)
+        CL_MoveMouse (dx, dy);
 }
 
 void IN_Frame (void)
@@ -248,13 +851,61 @@ void IN_Init (void)
     sdl_appActive = qTrue;
     SDL2_SetGrabState (qFalse);
 
+    // Ensure controller subsystem is up for SDL2 gamepad support.
+    SDL_InitSubSystem (SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC);
+    SDL_GameControllerEventState (SDL_ENABLE);
+
+    // Keep legacy CVAR name so existing menus/scripts work.
+    in_joystick = Cvar_Register ("in_joystick", "0", CVAR_ARCHIVE);
+    in_joystick_auto = Cvar_Register ("in_joystick_auto", "0", CVAR_ARCHIVE);
+    joy_autobind = Cvar_Register ("joy_autobind", "1", CVAR_ARCHIVE);
+    joy_deadzone = Cvar_Register ("joy_deadzone", "0.15", CVAR_ARCHIVE);
+    joy_move_scale = Cvar_Register ("joy_move_scale", "1.0", CVAR_ARCHIVE);
+    joy_look_scale = Cvar_Register ("joy_look_scale", "1800", CVAR_ARCHIVE);
+    joy_invert_y = Cvar_Register ("joy_invert_y", "0", CVAR_ARCHIVE);
+    joy_trigger_threshold = Cvar_Register ("joy_trigger_threshold", "0.55", CVAR_ARCHIVE);
+    joy_rumble_enable = Cvar_Register ("joy_rumble_enable", "1", CVAR_ARCHIVE);
+    joy_haptic_magnitude = Cvar_Register ("joy_haptic_magnitude", "1.0", CVAR_ARCHIVE);
+    joy_haptic_distance = Cvar_Register ("joy_haptic_distance", "1000.0", CVAR_ARCHIVE);
+
     if (!cmd_in_restart)
         cmd_in_restart = Cmd_AddCommand ("in_restart", IN_Restart_f, "Restarts input subsystem");
+
+    if (!cmd_joy_rumble)
+       cmd_joy_rumble = Cmd_AddCommand ("joy_rumble", IN_Rumble_f, "Test gamepad rumble: joy_rumble <low 0-65535> <high 0-65535> <ms>");
+
+    if (!cmd_joy_bind_defaults)
+        cmd_joy_bind_defaults = Cmd_AddCommand ("joy_bind_defaults", IN_JoyBindDefaults_f, "Apply default gamepad binds (won't override existing binds unless -force; use -zoom for LT=zoom)");
+
+    if (!cmd_joy_unbindall)
+        cmd_joy_unbindall = Cmd_AddCommand ("joy_unbindall", IN_JoyUnbindAll_f, "Clear all JOY/AUX bindings (keyboard/mouse untouched)");
+
+    if (SDL2_WantsController ()) {
+        if (SDL2_OpenFirstController () && in_joystick_auto && in_joystick_auto->intVal && in_joystick && !in_joystick->intVal)
+            Cvar_VariableSetValue (in_joystick, 1, qFalse);
+    }
 }
 
 void IN_Shutdown (void)
 {
     SDL2_SetGrabState (qFalse);
+
+    SDL2_CloseController ();
+
+    if (cmd_joy_bind_defaults) {
+        Cmd_RemoveCommand ("joy_bind_defaults", cmd_joy_bind_defaults);
+        cmd_joy_bind_defaults = NULL;
+    }
+
+    if (cmd_joy_unbindall) {
+        Cmd_RemoveCommand ("joy_unbindall", cmd_joy_unbindall);
+        cmd_joy_unbindall = NULL;
+    }
+
+    if (cmd_joy_rumble) {
+        Cmd_RemoveCommand ("joy_rumble", cmd_joy_rumble);
+        cmd_joy_rumble = NULL;
+    }
 
     if (cmd_in_restart) {
         Cmd_RemoveCommand ("in_restart", cmd_in_restart);

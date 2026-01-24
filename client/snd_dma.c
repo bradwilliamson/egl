@@ -886,8 +886,10 @@ void DMASnd_Update (refDef_t *rd)
 
 	// Mix some sound
 	SndImp_BeginPainting ();
-	if (!snd_audioDMA.buffer)
+	if (!snd_audioDMA.buffer) {
+		SndImp_Submit ();
 		return;
+	}
 
 	// Update DMA time
 	fullSamples = snd_audioDMA.samples / snd_audioDMA.channels;

@@ -727,6 +727,8 @@ void weapon_grenadelauncher_fire (edict_t *ent)
 
 	fire_grenade (ent, start, forward, damage, 600, 2.5, radius);
 
+	gi.AddCommandString("joy_rumble 15000 15000 150\n");
+
 	gi.WriteByte (SVC_MUZZLEFLASH);
 	gi.WriteShort (ent-g_edicts);
 	gi.WriteByte (MZ_GRENADE | is_silenced);
@@ -781,6 +783,8 @@ void Weapon_RocketLauncher_Fire (edict_t *ent)
 	Vec3Set (offset, 8, 8, ent->viewheight-8);
 	P_ProjectSource (ent->client, ent->s.origin, offset, forward, right, start);
 	fire_rocket (ent, start, forward, damage, 650, damage_radius, radius_damage);
+
+	gi.AddCommandString("joy_rumble 20000 20000 200\n");
 
 	// send muzzle flash
 	gi.WriteByte (SVC_MUZZLEFLASH);
@@ -853,6 +857,7 @@ void Weapon_Blaster_Fire (edict_t *ent)
 	else
 		damage = 10;
 	Blaster_Fire (ent, vec3Origin, damage, qFalse, EF_BLASTER);
+	gi.AddCommandString("joy_rumble 10000 10000 100\n");
 	ent->client->ps.gunFrame++;
 }
 
@@ -907,6 +912,8 @@ void Weapon_HyperBlaster_Fire (edict_t *ent)
 			Blaster_Fire (ent, offset, damage, qTrue, effect);
 			if (! ( (int)dmflags->floatVal & DF_INFINITE_AMMO ) )
 				ent->client->pers.inventory[ent->client->ammo_index]--;
+
+			gi.AddCommandString("joy_rumble 8000 8000 80\n");
 
 			ent->client->anim_priority = ANIM_ATTACK;
 			if (ent->client->ps.pMove.pmFlags & PMF_DUCKED)
@@ -1012,6 +1019,8 @@ void Machinegun_Fire (edict_t *ent)
 	Vec3Set (offset, 0, 8, ent->viewheight-8);
 	P_ProjectSource (ent->client, ent->s.origin, offset, forward, right, start);
 	fire_bullet (ent, start, forward, damage, kick, DEFAULT_BULLET_HSPREAD, DEFAULT_BULLET_VSPREAD, MOD_MACHINEGUN);
+
+	gi.AddCommandString("joy_rumble 5000 5000 50\n");
 
 	gi.WriteByte (SVC_MUZZLEFLASH);
 	gi.WriteShort (ent-g_edicts);
@@ -1214,6 +1223,8 @@ void weapon_shotgun_fire (edict_t *ent)
 	else
 		fire_shotgun (ent, start, forward, damage, kick, 500, 500, DEFAULT_SHOTGUN_COUNT, MOD_SHOTGUN);
 
+	gi.AddCommandString("joy_rumble 15000 15000 150\n");
+
 	// send muzzle flash
 	gi.WriteByte (SVC_MUZZLEFLASH);
 	gi.WriteShort (ent-g_edicts);
@@ -1333,6 +1344,8 @@ void weapon_railgun_fire (edict_t *ent)
 	P_ProjectSource (ent->client, ent->s.origin, offset, forward, right, start);
 	fire_rail (ent, start, forward, damage, kick);
 
+	gi.AddCommandString("joy_rumble 25000 25000 250\n");
+
 	// send muzzle flash
 	gi.WriteByte (SVC_MUZZLEFLASH);
 	gi.WriteShort (ent-g_edicts);
@@ -1415,6 +1428,8 @@ void weapon_bfg_fire (edict_t *ent)
 	Vec3Set (offset, 8, 8, ent->viewheight-8);
 	P_ProjectSource (ent->client, ent->s.origin, offset, forward, right, start);
 	fire_bfg (ent, start, forward, damage, 400, damage_radius);
+
+	gi.AddCommandString("joy_rumble 30000 30000 500\n");
 
 	ent->client->ps.gunFrame++;
 

@@ -36,7 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "memory.h"
 #include "parse.h"
 
-#define EGL_VERSTR			"0.3.2"
+#define EGL_VERSTR			"0.3.3"
 #define BASE_MODDIRNAME		"baseq2"
 
 #define USE_CURL	1
@@ -130,6 +130,11 @@ void		Sys_DestroyConsole (void);
 void		Sys_CreateConsole (void);
 void		Sys_SetConsoleTitle (const char *buf);
 void		Sys_SetErrorText (const char *buf);
+
+// Returns a reasonable default base directory for filesystem mounting.
+// On Windows we default to the directory containing the executable, so the
+// engine works even when launched from a shortcut with a different working dir.
+char		*Sys_DefaultBaseDir (void);
 
 /*
 =============================================================================

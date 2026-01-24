@@ -123,7 +123,10 @@ enum {
 	UIF_DBLCLICK		= 1 << 8,
 	UIF_SELONLY			= 1 << 9,
 	UIF_NOSELBAR		= 1 << 10,
-	UIF_FORCESELBAR		= 1 << 11
+	UIF_FORCESELBAR		= 1 << 11,
+
+	// Draw action text like a left-column label (green), matching sliders/spincontrols.
+	UIF_LCOLUMN			= 1 << 12
 };
 
 #define RCOLUMN_OFFSET		(UIFT_SIZE*2)

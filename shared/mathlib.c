@@ -153,17 +153,14 @@ FloatToByte
 */
 byte FloatToByte (float x)
 {
-	union {
-		float			f;
-		uint32			i;
-	} f2i;
-
-	// Shift float to have 8bit fraction at base of number
-	f2i.f = x + 32768.0f;
-	f2i.i &= 0x7FFFFF;
-
-	// Then read as integer and kill float bits...
-	return (byte)min(f2i.i, 255);
+	// Clamp to 0-255 range
+	if (x < 0.0f)
+		return 0;
+	if (x > 255.0f)
+		return 255;
+	
+	// For valid range, use fast conversion
+	return (byte)(int)(x + 0.5f);
 }
 
 
@@ -175,20 +172,21 @@ ColorNormalizef
 float ColorNormalizef (const float *in, float *out)
 {
 	float	f = max (max (in[0], in[1]), in[2]);
+	float	scale;
 
 	if (f > 1.0f) {
-		f = 1.0f / f;
-		out[0] = in[0] * f;
-		out[1] = in[1] * f;
-		out[2] = in[2] * f;
+		scale = 1.0f / f;
+		out[0] = in[0] * scale;
+		out[1] = in[1] * scale;
+		out[2] = in[2] * scale;
+		return scale;
 	}
 	else {
 		out[0] = in[0];
 		out[1] = in[1];
 		out[2] = in[2];
+		return 1.0f;
 	}
-
-	return f;
 }
 
 
