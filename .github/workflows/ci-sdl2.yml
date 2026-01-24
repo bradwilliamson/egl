@@ -143,6 +143,11 @@ jobs:
         run: |
           set -o pipefail
           echo "MSYSTEM=$MSYSTEM"
+          echo "MSYSTEM_PREFIX=$MSYSTEM_PREFIX"
+          export EGL_MSYS2_ROOT=""
+          export EGL_MSYS2_PREFIX="$MSYSTEM_PREFIX"
+          echo "Using SDL2 from: $MSYSTEM_PREFIX/bin/SDL2.dll"
+          ls -la "$MSYSTEM_PREFIX/bin/SDL2.dll"
           echo "gcc --version:"; gcc --version || true
           echo "make --version:"; make --version || true
           make clean
