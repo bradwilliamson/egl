@@ -131,6 +131,11 @@ void		Sys_CreateConsole (void);
 void		Sys_SetConsoleTitle (const char *buf);
 void		Sys_SetErrorText (const char *buf);
 
+// Returns a reasonable default base directory for filesystem mounting.
+// On Windows we default to the directory containing the executable, so the
+// engine works even when launched from a shortcut with a different working dir.
+char		*Sys_DefaultBaseDir (void);
+
 /*
 =============================================================================
 
