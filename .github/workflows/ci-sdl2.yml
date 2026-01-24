@@ -40,6 +40,11 @@ jobs:
             exit 2
           fi
 
+      - name: Build and run unit tests
+        run: |
+          set -o pipefail
+          make -C tests ci 2>&1 | tee tests/test-output.log
+
       - name: Show build log (tail)
         if: always()
         run: |
@@ -91,6 +96,8 @@ jobs:
             ci/compile_smoke.log
             ci/vulkan_smoke
             ci/compile_vulkan_smoke.log
+            tests/*.log
+            tests/test-output.log
 
   build-sdl2-windows:
     runs-on: windows-latest
@@ -130,6 +137,11 @@ jobs:
           make USE_SDL2=1 2>&1 | tee build-win.log
           make dedicated USE_SDL2=1 2>&1 | tee -a build-win.log
 
+      - name: Build and run unit tests (Windows)
+        run: |
+          set -o pipefail
+          make -C tests ci 2>&1 | tee tests/test-output.log
+
       - name: Compile Vulkan smoke test (Windows)
         run: |
           set -o pipefail
@@ -146,3 +158,5 @@ jobs:
             build-win.log
             compile-vulkan-smoke-win.log
             ci/vulkan_smoke.o
+            tests/*.log
+            tests/test-output.log
