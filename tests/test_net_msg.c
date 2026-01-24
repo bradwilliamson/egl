@@ -134,9 +134,9 @@ void test_MSG_WriteByte_handles_out_of_range_positive(void) {
     MSG_Init(&msg, buffer, sizeof(buffer));
     MSG_WriteByte(&msg, 256);
     
-    /* Should still write, but value will be truncated */
+    /* Should clamp to 255 */
     TEST_ASSERT_EQUAL(1, msg.curSize);
-    TEST_ASSERT_EQUAL(0, buffer[0]); /* 256 & 0xFF = 0 */
+    TEST_ASSERT_EQUAL(255, buffer[0]); /* 256 clamped to 255 */
 }
 
 /*
