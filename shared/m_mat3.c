@@ -55,7 +55,7 @@ void Matrix3_Angles (mat3x3_t mat, vec3_t angles)
 	if (fabs (c) > 0.005) {			// Gimball lock?
 		c = 1.0f / c;
 		yaw = (float)RAD2DEG (atan2 (mat[0][1] * c, mat[0][0] * c));
-		roll = (float)RAD2DEG (atan2 (-mat[1][2] * c, mat[2][2] * c));
+		roll = (float)RAD2DEG (atan2 (mat[1][2] * c, mat[2][2] * c));
 	}
 	else {
 		if (mat[0][2] > 0)

@@ -30,15 +30,10 @@ void test_Matrix3_Angles_roundtrip(void){
     Angles_Matrix3(ang, m);
     Matrix3_Angles(m, out);
 
-    // Debug: print the values
-    printf("Input:  pitch=%.2f yaw=%.2f roll=%.2f\n", ang[0], ang[1], ang[2]);
-    printf("Output: pitch=%.2f yaw=%.2f roll=%.2f\n", out[0], out[1], out[2]);
-
     // Angles may wrap; compare modulo 360
     for (int i=0;i<3;i++){
         float diff = fabsf(ang[i] - out[i]);
         if (diff > 180) diff = fabsf(diff - 360);
-        printf("Axis %d: diff=%.2f\n", i, diff);
         TEST_ASSERT_TRUE(diff < 0.5f);
     }
 }
