@@ -14,9 +14,15 @@ SHARED_SRC = \
 	../shared/m_angles.c \
 	../shared/m_plane.c \
 	../shared/m_bounds.c \
+	../shared/m_mat3.c \
+	../shared/m_mat4.c \
+	../shared/m_quat.c \
 	../shared/byteswap.c \
 	../shared/string.c \
 	../shared/shared.c
+
+# Stub for Com_Printf (used by mathlib.c and string.c)
+COM_STUBS = test_stubs.c
 
 SHARED_SRC_NO_PLANE = \
 	../shared/mathlib.c \
@@ -103,8 +109,8 @@ clean:
 
 # Individual test targets
 
-test_mathlib: test_mathlib.c $(SHARED_SRC)
-	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) -lm
+test_mathlib: test_mathlib.c $(SHARED_SRC) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
 
 test_byteswap: test_byteswap.c ../shared/byteswap.c
 	$(CC) $(CFLAGS) -o $@ $< ../shared/byteswap.c
@@ -178,11 +184,11 @@ test_pmove_airaccelerate: test_pmove_airaccelerate.c
 test_pmove_quantization: test_pmove_quantization.c
 	$(CC) $(CFLAGS) -o $@ $< -lm
 
-test_bounds: test_bounds.c $(SHARED_SRC)
-	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) -lm
+test_bounds: test_bounds.c $(SHARED_SRC) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
 
-test_plane: test_plane.c $(SHARED_SRC)
-	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) -lm
+test_plane: test_plane.c $(SHARED_SRC) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
 
-test_mat_quat: test_mat_quat.c $(SHARED_SRC)
-	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) -lm
+test_mat_quat: test_mat_quat.c $(SHARED_SRC) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
