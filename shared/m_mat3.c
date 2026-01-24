@@ -62,7 +62,7 @@ void Matrix3_Angles (mat3x3_t mat, vec3_t angles)
 			pitch = -90;
 		else
 			pitch = 90;
-		yaw = (float)RAD2DEG (atan2 (mat[1][0], (-1)*mat[1][1]));
+		yaw = (float)RAD2DEG (atan2 (mat[1][0], mat[1][1]));
 		roll = 0;
 	}
 
