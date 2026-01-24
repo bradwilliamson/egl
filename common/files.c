@@ -1061,7 +1061,7 @@ mPack_t *FS_LoadPAK (char *fileName, qBool complain)
 		outPackFile++;
 	}
 
-	Com_Printf (0, "FS_LoadPAK: loaded \"%s\"\n", fileName);
+	Com_Printf (0, "FS_LoadPAK: loaded \"%s\" (%i files)\n", fileName, (int)numFiles);
 	return outPack;
 }
 
@@ -1742,11 +1742,13 @@ void FS_Init (void)
 	Cmd_AddCommand ("listHandles",	FS_ListHandles_f,	"Lists active files");
 	Cmd_AddCommand ("path",			FS_Path_f,			"");
 
-	fs_basedir		= Cvar_Register ("basedir",			".",	CVAR_READONLY);
+	fs_basedir		= Cvar_Register ("basedir",			Sys_DefaultBaseDir (),	CVAR_READONLY);
 	fs_cddir		= Cvar_Register ("cddir",			"",		CVAR_READONLY);
 	fs_game			= Cvar_Register ("game",			"",		CVAR_LATCH_SERVER|CVAR_SERVERINFO|CVAR_RESET_GAMEDIR);
 	fs_gamedircvar	= Cvar_Register ("gamedir",			"",		CVAR_SERVERINFO|CVAR_READONLY);
 	fs_defaultPaks	= Cvar_Register ("fs_defaultPaks",	"1",	CVAR_ARCHIVE);
+
+	Com_Printf (0, "basedir: %s\n", fs_basedir->string);
 
 	// Load pak files
 	if (fs_cddir->string[0])

@@ -33,6 +33,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include <conio.h>
 #include <VersionHelpers.h>
 
+#include <dbghelp.h>
+
 #define MINIMUM_WIN_MEMORY	0x0a00000
 #define MAXIMUM_WIN_MEMORY	0x1000000
 
@@ -41,6 +43,115 @@ winInfo_t	sys_winInfo;
 #define MAX_NUM_ARGVS	128
 static int	sys_argCnt = 0;
 static char	*sys_argVars[MAX_NUM_ARGVS];
+
+static qBool sys_minidump_installed = qFalse;
+
+static char sys_defaultBaseDir[MAX_OSPATH] = { 0 };
+static qBool sys_defaultBaseDirInit = qFalse;
+
+char *Sys_DefaultBaseDir (void)
+{
+	char exePath[MAX_OSPATH];
+	DWORD exeLen;
+	char *lastSep;
+
+	if (sys_defaultBaseDirInit)
+		return sys_defaultBaseDir[0] ? sys_defaultBaseDir : ".";
+
+	sys_defaultBaseDirInit = qTrue;
+
+	// Default the filesystem basedir to the executable directory.
+	// This avoids failures when EGL is launched from a shortcut with a different
+	// working directory.
+	exeLen = GetModuleFileNameA (NULL, exePath, sizeof (exePath));
+	if (exeLen > 0 && exeLen < sizeof (exePath)) {
+		for (DWORD i = 0; i < exeLen; ++i) {
+			if (exePath[i] == '\\')
+				exePath[i] = '/';
+		}
+		lastSep = strrchr (exePath, '/');
+		if (lastSep) {
+			*lastSep = 0;
+			Q_strncpyz (sys_defaultBaseDir, exePath, sizeof (sys_defaultBaseDir));
+		}
+	}
+	if (!sys_defaultBaseDir[0]) {
+		_getcwd (sys_defaultBaseDir, sizeof (sys_defaultBaseDir));
+		for (char *p = sys_defaultBaseDir; *p; ++p) {
+			if (*p == '\\')
+				*p = '/';
+		}
+	}
+
+	return sys_defaultBaseDir[0] ? sys_defaultBaseDir : ".";
+}
+
+static void Sys_WriteMiniDump (EXCEPTION_POINTERS *exception)
+{
+	HANDLE hFile;
+	SYSTEMTIME st;
+	char dir[MAX_OSPATH];
+	char dumpPath[MAX_OSPATH];
+	char txtPath[MAX_OSPATH];
+	FILE *f;
+
+	GetLocalTime (&st);
+
+	Q_snprintfz (dir, sizeof (dir), "crashdumps");
+	CreateDirectoryA (dir, NULL);
+
+	Q_snprintfz (dumpPath, sizeof (dumpPath), "%s\\egl_%04u%02u%02u_%02u%02u%02u_pid%lu.dmp",
+		dir,
+		(unsigned)st.wYear, (unsigned)st.wMonth, (unsigned)st.wDay,
+		(unsigned)st.wHour, (unsigned)st.wMinute, (unsigned)st.wSecond,
+		(unsigned long)GetCurrentProcessId ());
+
+	Q_snprintfz (txtPath, sizeof (txtPath), "%s\\egl_%04u%02u%02u_%02u%02u%02u_pid%lu.txt",
+		dir,
+		(unsigned)st.wYear, (unsigned)st.wMonth, (unsigned)st.wDay,
+		(unsigned)st.wHour, (unsigned)st.wMinute, (unsigned)st.wSecond,
+		(unsigned long)GetCurrentProcessId ());
+
+	f = fopen (txtPath, "wb");
+	if (f) {
+		fprintf (f, "EGL crash report\n");
+		fprintf (f, "Time: %04u-%02u-%02u %02u:%02u:%02u\n",
+			(unsigned)st.wYear, (unsigned)st.wMonth, (unsigned)st.wDay,
+			(unsigned)st.wHour, (unsigned)st.wMinute, (unsigned)st.wSecond);
+		fprintf (f, "PID: %lu\n", (unsigned long)GetCurrentProcessId ());
+		if (exception && exception->ExceptionRecord) {
+			fprintf (f, "ExceptionCode: 0x%08lx\n", (unsigned long)exception->ExceptionRecord->ExceptionCode);
+			fprintf (f, "ExceptionAddress: 0x%p\n", exception->ExceptionRecord->ExceptionAddress);
+		}
+		fprintf (f, "Dump: %s\n", dumpPath);
+		fclose (f);
+	}
+
+	hFile = CreateFileA (dumpPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile != INVALID_HANDLE_VALUE) {
+		MINIDUMP_EXCEPTION_INFORMATION mdei;
+		mdei.ThreadId = GetCurrentThreadId ();
+		mdei.ExceptionPointers = exception;
+		mdei.ClientPointers = FALSE;
+
+		MiniDumpWriteDump (
+			GetCurrentProcess (),
+			GetCurrentProcessId (),
+			hFile,
+			(MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory),
+			exception ? &mdei : NULL,
+			NULL,
+			NULL);
+
+		CloseHandle (hFile);
+	}
+}
+
+static LONG WINAPI Sys_UnhandledExceptionFilter (struct _EXCEPTION_POINTERS *exception)
+{
+	Sys_WriteMiniDump (exception);
+	return EXCEPTION_EXECUTE_HANDLER;
+}
 
 /*
 ==============================================================================
@@ -60,10 +171,19 @@ void Sys_Init (void)
 	// Make sure the timer is high precision, otherwise NT gets 18ms resolution
 	timeBeginPeriod (1);
 
+	// Ensure basedir is initialized (lazy-init in Sys_DefaultBaseDir, but
+	// calling it here ensures it's ready before FS_Init).
+	Sys_DefaultBaseDir ();
+
 	if (!IsWindowsVersionOrGreater(4, 0, 0))
 		Sys_Error ("EGL requires windows version 4 or greater");
 
 	sys_winInfo.isWin32 = qFalse;
+
+	if (!sys_minidump_installed) {
+		SetUnhandledExceptionFilter (Sys_UnhandledExceptionFilter);
+		sys_minidump_installed = qTrue;
+	}
 }
 
 
@@ -316,7 +436,7 @@ char *Sys_GetClipboardData (void)
 
 char	sys_findBase[MAX_OSPATH];
 char	sys_findPath[MAX_OSPATH];
-int		sys_findHandle;
+intptr_t	sys_findHandle;
 
 static qBool Sys_CompareFileAttributes (int found, uint32 mustHave, uint32 cantHave)
 {

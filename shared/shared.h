@@ -590,6 +590,7 @@ void		Matrix4_Rotate (mat4x4_t a, float angle, float x, float y, float z);
 void		Matrix4_Scale (mat4x4_t m, float x, float y, float z);
 void		Matrix4_Translate (mat4x4_t m, float x, float y, float z);
 void		Matrix4_Transpose (mat4x4_t m, mat4x4_t ret);
+void		Matrix4_Invert (mat4x4_t src, mat4x4_t dst);
 
 //
 // m_quat.c
