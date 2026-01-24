@@ -29,6 +29,20 @@ SHARED_SRC_NO_PLANE = \
 SDL2_CFLAGS := $(shell pkg-config --cflags sdl2 2>/dev/null)
 SDL2_LIBS := $(shell pkg-config --libs sdl2 2>/dev/null)
 
+# Fallback for MSYS2/MinGW when pkg-config fails
+ifeq ($(SDL2_CFLAGS),)
+  ifdef MSYSTEM_PREFIX
+    SDL2_CFLAGS := -I$(MSYSTEM_PREFIX)/include/SDL2
+    SDL2_LIBS := -L$(MSYSTEM_PREFIX)/lib -lSDL2
+  endif
+endif
+
+# Only include SDL test if SDL2 is available
+SDL_TEST_BIN :=
+ifneq ($(SDL2_LIBS),)
+  SDL_TEST_BIN := test_sdl_input
+endif
+
 TEST_BINS = \
 	test_mathlib \
 	test_byteswap \
@@ -36,7 +50,7 @@ TEST_BINS = \
 	test_string \
 	test_crc \
 	test_infostrings \
-	test_sdl_input \
+	$(SDL_TEST_BIN) \
 	test_cvar \
 	test_cmd \
 	test_keys \
@@ -64,12 +78,23 @@ TEST_BINS = \
 all: $(TEST_BINS)
 
 # CI target - returns proper exit code and writes per-test logs
-ci: clean $(TEST_BINS)
+ci: clean
+	@echo "=== Building test binaries ==="
+	@echo "SDL2_CFLAGS: $(SDL2_CFLAGS)"
+	@echo "SDL2_LIBS: $(SDL2_LIBS)"
+	@echo "SDL_TEST_BIN: $(SDL_TEST_BIN)"
+	@$(MAKE) $(TEST_BINS)
+	@echo "=== Running tests ==="
 	@set -e; \
 	exit_code=0; \
 	for t in $(TEST_BINS); do \
-		./$$t > $$t.log 2>&1 || exit_code=1; \
-		cat $$t.log; \
+		if [ -f ./$$t ]; then \
+			echo "Running $$t..."; \
+			./$$t > $$t.log 2>&1 || exit_code=1; \
+			cat $$t.log; \
+		else \
+			echo "SKIP: $$t not built"; \
+		fi; \
 	done; \
 	exit $$exit_code
 

@@ -158,11 +158,14 @@ jobs:
         run: |
           set -o pipefail
           export PATH="$MSYSTEM_PREFIX/bin:$PATH"
+          export MSYSTEM_PREFIX="$MSYSTEM_PREFIX"
           if [ ! -f "$MSYSTEM_PREFIX/bin/SDL2.dll" ]; then
             echo "ERROR: SDL2.dll missing in $MSYSTEM_PREFIX/bin"
             ls -la "$MSYSTEM_PREFIX/bin" | sed -n '1,200p' || true
             exit 2
           fi
+          echo "MSYSTEM_PREFIX=$MSYSTEM_PREFIX"
+          echo "PATH=$PATH"
           make -C tests ci 2>&1 | tee tests/test-output.log
 
       - name: Compile Vulkan smoke test (Windows)
