@@ -74,17 +74,62 @@ void test_Quat_Lerp_edgecases(void){
     TEST_ASSERT_FLOAT_WITHIN(1e-6f, b[3], out[3]);
 }
 
+static void AssertMat3Within(float delta, mat3x3_t expected, mat3x3_t actual)
+{
+    for (int r = 0; r < 3; r++){
+        for (int c = 0; c < 3; c++){
+            TEST_ASSERT_FLOAT_WITHIN(delta, expected[r][c], actual[r][c]);
+        }
+    }
+}
+
 void test_Matrix3_Quat_roundtrip(void){
-    mat3x3_t m = {{{1,0,0},{
+    vec3_t ang = {10.0f, 20.0f, 30.0f};
+    mat3x3_t m, out;
+    quat_t q;
+
+    Angles_Matrix3(ang, m);
+    Matrix3_Quat(m, q);
+    Quat_Matrix3(q, out);
+
+    AssertMat3Within(1e-4f, m, out);
+}
+
+void test_Quat_Normalize(void){
+    quat_t q = {0.0f, 0.0f, 0.0f, 2.0f};
+    float len2 = Quat_Normalize(q);
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 4.0f, len2);
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0.0f, q[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0.0f, q[1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0.0f, q[2]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 1.0f, q[3]);
+}
+
+void test_Quat_Multiply_unit(void){
+    quat_t q = {0.0f, 0.70710678f, 0.0f, 0.70710678f};
+    quat_t inv, res;
+
+    Quat_Inverse(q, inv);
+    Quat_Multiply(q, inv, res);
+
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.0f, res[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.0f, res[1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.0f, res[2]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 1.0f, res[3]);
+}
+
+int main(void)
+{
+    UNITY_BEGIN();
+
     RUN_TEST(test_Matrix3_Multiply_identity);
     RUN_TEST(test_Matrix3_Angles_roundtrip);
     RUN_TEST(test_Matrix4_Multiply_identity);
     RUN_TEST(test_Quat_Multiply_and_inverse);
-RUN_TEST(test_Quat_Lerp_edgecases);
-
-RUN_TEST(test_Matrix3_Quat_roundtrip);
-RUN_TEST(test_Quat_Normalize);
-RUN_TEST(test_Quat_Multiply_unit);
+    RUN_TEST(test_Quat_Lerp_edgecases);
+    RUN_TEST(test_Matrix3_Quat_roundtrip);
+    RUN_TEST(test_Quat_Normalize);
+    RUN_TEST(test_Quat_Multiply_unit);
 
     return UNITY_END();
 }
