@@ -144,8 +144,8 @@ jobs:
           set -o pipefail
           echo "MSYSTEM=$MSYSTEM"
           echo "MSYSTEM_PREFIX=$MSYSTEM_PREFIX"
-          export EGL_MSYS2_ROOT=""
-          export EGL_MSYS2_PREFIX="$MSYSTEM_PREFIX"
+          export EGL_MSYS2_ROOT="$(cygpath -w /)"
+          export EGL_MSYS2_PREFIX="$(basename "$MSYSTEM_PREFIX")"
           echo "Using SDL2 from: $MSYSTEM_PREFIX/bin/SDL2.dll"
           ls -la "$MSYSTEM_PREFIX/bin/SDL2.dll"
           echo "gcc --version:"; gcc --version || true
@@ -157,6 +157,12 @@ jobs:
       - name: Build and run unit tests (Windows)
         run: |
           set -o pipefail
+          export PATH="$MSYSTEM_PREFIX/bin:$PATH"
+          if [ ! -f "$MSYSTEM_PREFIX/bin/SDL2.dll" ]; then
+            echo "ERROR: SDL2.dll missing in $MSYSTEM_PREFIX/bin"
+            ls -la "$MSYSTEM_PREFIX/bin" | sed -n '1,200p' || true
+            exit 2
+          fi
           make -C tests ci 2>&1 | tee tests/test-output.log
 
       - name: Compile Vulkan smoke test (Windows)
