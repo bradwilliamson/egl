@@ -1808,6 +1808,8 @@ void teleporter_touch (edict_t *self, edict_t *other, cBspPlane_t *plane, cBspSu
 	Vec3Copy (dest->s.origin, other->s.oldOrigin);
 	other->s.origin[2] += 10;
 
+	// gi.AddCommandString("joy_rumble 15000 15000 200\n");
+
 	// clear the velocity and hold them in place briefly
 	Vec3Clear (other->velocity);
 	other->client->ps.pMove.pmTime = 160>>3;		// hold time

@@ -941,6 +941,8 @@ struct gclient_s
 	float		flood_when[10];		// when messages were said
 	int			flood_whenhead;		// head pointer for when said
 
+	float		rumble_time;		// last rumble time
+
 	float		respawn_time;		// can respawn when time > this
 
 	edict_t		*chase_target;		// player we are chasing

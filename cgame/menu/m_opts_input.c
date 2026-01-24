@@ -42,8 +42,9 @@ typedef struct m_inputMenu_s {
 	uiList_t		joystick_toggle;
 	uiList_t		joystick_auto_toggle;
 	uiList_t		joy_autobind_toggle;
-	uiAction_t	apply_gamepad_binds_action;
-	uiAction_t	clear_gamepad_binds_action;
+	uiList_t		apply_gamepad_binds_action;
+	uiList_t		apply_gamepad_binds_zoom_action;
+	uiList_t		clear_gamepad_binds_action;
 
 	uiSlider_t	joy_deadzone_slider;
 	uiSlider_t	joy_deadzone_amount;
@@ -93,12 +94,23 @@ static void JoyAutobindFunc (void *unused)
 
 static void ApplyGamepadBindsFunc (void *unused)
 {
-	cgi.Cbuf_InsertText ("joy_bind_defaults\n");
+	if (m_inputMenu.apply_gamepad_binds_action.curValue == 1) {
+		cgi.Cbuf_InsertText ("joy_bind_defaults\n");
+	}
+}
+
+static void ApplyGamepadBindsZoomFunc (void *unused)
+{
+	if (m_inputMenu.apply_gamepad_binds_zoom_action.curValue == 1) {
+		cgi.Cbuf_InsertText ("joy_bind_defaults -zoom\n");
+	}
 }
 
 static void ClearGamepadBindsFunc (void *unused)
 {
-	cgi.Cbuf_InsertText ("joy_unbindall\n");
+	if (m_inputMenu.clear_gamepad_binds_action.curValue == 1) {
+		cgi.Cbuf_InsertText ("joy_unbindall\n");
+	}
 }
 
 static void JoyDeadzoneFunc (void *unused)
@@ -297,14 +309,22 @@ static void InputMenu_Init (void)
 	m_inputMenu.joy_autobind_toggle.itemNames			= yesno_names;
 	m_inputMenu.joy_autobind_toggle.generic.statusBar	= "Auto-apply default gamepad binds when a controller is first detected";
 
-	m_inputMenu.apply_gamepad_binds_action.generic.type		= UITYPE_ACTION;
+	m_inputMenu.apply_gamepad_binds_action.generic.type		= UITYPE_SPINCONTROL;
 	m_inputMenu.apply_gamepad_binds_action.generic.name		= "Apply gamepad defaults";
 	m_inputMenu.apply_gamepad_binds_action.generic.callBack	= ApplyGamepadBindsFunc;
+	m_inputMenu.apply_gamepad_binds_action.itemNames			= yesno_names;
 	m_inputMenu.apply_gamepad_binds_action.generic.statusBar	= "Apply default gamepad binds (won't overwrite existing binds)";
 
-	m_inputMenu.clear_gamepad_binds_action.generic.type		= UITYPE_ACTION;
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.type		= UITYPE_SPINCONTROL;
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.name		= "Apply defaults (LT=zoom)";
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.callBack	= ApplyGamepadBindsZoomFunc;
+	m_inputMenu.apply_gamepad_binds_zoom_action.itemNames			= yesno_names;
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.statusBar	= "Apply default gamepad binds with LT=zoom (won't overwrite existing binds)";
+
+	m_inputMenu.clear_gamepad_binds_action.generic.type		= UITYPE_SPINCONTROL;
 	m_inputMenu.clear_gamepad_binds_action.generic.name		= "Clear gamepad binds";
 	m_inputMenu.clear_gamepad_binds_action.generic.callBack	= ClearGamepadBindsFunc;
+	m_inputMenu.clear_gamepad_binds_action.itemNames			= yesno_names;
 	m_inputMenu.clear_gamepad_binds_action.generic.statusBar	= "Clear JOY/AUX bindings (keyboard/mouse untouched)";
 
 	m_inputMenu.joy_deadzone_slider.generic.type		= UITYPE_SLIDER;
@@ -419,6 +439,7 @@ static void InputMenu_Init (void)
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joystick_auto_toggle);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_autobind_toggle);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.apply_gamepad_binds_action);
+	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.apply_gamepad_binds_zoom_action);
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.clear_gamepad_binds_action);
 
 	UI_AddItem (&m_inputMenu.frameWork,		&m_inputMenu.joy_deadzone_slider);
@@ -494,6 +515,8 @@ static void InputMenu_Draw (void)
 	m_inputMenu.joy_autobind_toggle.generic.y		= y += UIFT_SIZEINC;
 	m_inputMenu.apply_gamepad_binds_action.generic.x	= 0;
 	m_inputMenu.apply_gamepad_binds_action.generic.y	= y += UIFT_SIZEINC;
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.x	= 0;
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.y	= y += UIFT_SIZEINC;
 	m_inputMenu.clear_gamepad_binds_action.generic.x	= 0;
 	m_inputMenu.clear_gamepad_binds_action.generic.y	= y += UIFT_SIZEINC;
 

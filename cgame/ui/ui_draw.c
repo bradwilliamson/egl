@@ -145,21 +145,41 @@ static void Action_Draw (uiAction_t *a)
 {
 	uint32	txtflags = 0;
 	float	xoffset = 0;
+	float	x;
+	size_t	nameLen;
+	size_t	nameChars;
+	float *color;
 
 	if (!a) return;
 	if (!a->generic.name) return;
 
+	nameLen = strlen (a->generic.name);
+	nameChars = Q_ColorCharCount (a->generic.name, (int)nameLen);
+	color = (a->generic.flags & UIF_LCOLUMN) ? Q_colorGreen : Q_colorWhite;
+
 	ItemTxtFlags (a, txtflags);
+
+	if (a->generic.flags & UIF_LCOLUMN) {
+		x = a->generic.x + a->generic.parent->x + LCOLUMN_OFFSET;
+		if (nameChars > 0)
+			x -= (nameChars - 1) * UISIZE_TYPE (a->generic.flags);
+		cgi.R_DrawString (NULL, x, a->generic.y + a->generic.parent->y,
+			UISCALE_TYPE (a->generic.flags), UISCALE_TYPE (a->generic.flags), txtflags, a->generic.name, color);
+
+		if (a->generic.ownerDraw)
+			a->generic.ownerDraw (a);
+		return;
+	}
 
 	if (a->generic.flags & UIF_LEFT_JUSTIFY)
 		xoffset = 0;
 	else if (a->generic.flags & UIF_CENTERED)
-		xoffset = (((Q_ColorCharCount (a->generic.name, (int)strlen (a->generic.name))) * UISIZE_TYPE (a->generic.flags))*0.5);
+		xoffset = ((nameChars * UISIZE_TYPE (a->generic.flags))*0.5);
 	else
-		xoffset = ((Q_ColorCharCount (a->generic.name, (int)strlen (a->generic.name))) * UISIZE_TYPE (a->generic.flags)) + RCOLUMN_OFFSET;
+		xoffset = (nameChars * UISIZE_TYPE (a->generic.flags)) + RCOLUMN_OFFSET;
 
 	cgi.R_DrawString (NULL, a->generic.x + a->generic.parent->x - xoffset, a->generic.y + a->generic.parent->y,
-		UISCALE_TYPE (a->generic.flags), UISCALE_TYPE (a->generic.flags), txtflags, a->generic.name, Q_colorWhite);
+		UISCALE_TYPE (a->generic.flags), UISCALE_TYPE (a->generic.flags), txtflags, a->generic.name, color);
 
 	if (a->generic.ownerDraw)
 		a->generic.ownerDraw (a);

@@ -439,6 +439,7 @@ void		CL_SendCmd (void);
 void		CL_SendMove (userCmd_t *cmd);
 
 void		CL_InputInit (void);
+void		IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float volume);
 
 //
 // cl_main.c

@@ -1673,6 +1673,7 @@ void ClientThink (edict_t *ent, userCmd_t *ucmd)
 		if (ent->groundentity && !pm.groundEntity && (pm.cmd.upMove >= 10) && (pm.waterLevel == 0))
 		{
 			gi.sound(ent, CHAN_VOICE, gi.soundindex("*jump1.wav"), 1, ATTN_NORM, 0);
+			gi.AddCommandString("joy_rumble 8000 8000 100\n");
 			PlayerNoise(ent, ent->s.origin, PNOISE_SELF);
 		}
 

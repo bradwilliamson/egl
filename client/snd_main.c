@@ -1094,6 +1094,11 @@ void Snd_StartSound (vec3_t origin, int entNum, entChannel_t entChannel, struct 
 	if (!sfx)
 		return;
 
+#ifdef HAVE_SDL2
+	// Trigger rumble/haptic effect based on sound name
+	IN_JoyRumbleTrigger (sfx->name, origin, entNum, volume);
+#endif
+
 	if (sfx->name[0] == '*')
 		sfx = Snd_RegisterSexedSound (sfx->name, entNum);
 
