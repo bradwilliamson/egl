@@ -127,6 +127,18 @@ jobs:
             mingw-w64-x86_64-zlib
             mingw-w64-x86_64-minizip
 
+      - name: Ensure SDL2 runtime is present (Windows)
+        run: |
+          set -e
+          pacman -S --noconfirm --needed mingw-w64-x86_64-SDL2
+          if [ ! -f /mingw64/bin/SDL2.dll ]; then
+            echo "ERROR: /mingw64/bin/SDL2.dll is missing"
+            pacman -Qi mingw-w64-x86_64-SDL2 || true
+            ls -la /mingw64/bin | sed -n '1,200p' || true
+            exit 2
+          fi
+          ls -la /mingw64/bin/SDL2.dll
+
       - name: Build project (Windows, SDL2)
         run: |
           set -o pipefail
