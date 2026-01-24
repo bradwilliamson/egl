@@ -10,11 +10,6 @@
 /* Include the actual implementation */
 #include "../shared/shared.h"
 
-/* Stubs for functions needed by shared code but we don't want to link */
-void Com_Printf(comPrint_t flags, char *fmt, ...) {
-    /* Silently ignore for tests */
-}
-
 /*
  * ============================================================================
  * PlaneFromPoints Tests

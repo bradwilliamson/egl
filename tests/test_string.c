@@ -8,11 +8,6 @@
 #include "../unity/unity.h"
 #include "shared/shared.h"
 
-/* Stubs for functions needed by shared code */
-void Com_Printf(comPrint_t flags, char *fmt, ...) {
-    /* Silently ignore for tests */
-}
-
 /*
  * ============================================================================
  * Q_strncpyz Tests

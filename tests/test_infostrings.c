@@ -11,11 +11,6 @@ Info strings are backslash-delimited key-value pairs used by Quake 2
 #include <string.h>
 #include "../common/common.h"
 
-/* Stubs for functions needed by infostrings code */
-void Com_Printf(comPrint_t flags, char *fmt, ...) {
-    /* Silently ignore for tests */
-}
-
 /*
  * ============================================================================
  * Info_ValueForKey Tests

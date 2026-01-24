@@ -14,11 +14,6 @@
 #include "../shared/shared.h"
 #include "../common/protocol.h"
 
-/* Stub for Com_Printf and Com_Error since we don't want to link the whole engine */
-void Com_Printf(comPrint_t flags, char *fmt, ...) {
-    /* Silently ignore for tests */
-}
-
 void Com_Error(comError_t code, char *fmt, ...) {
     /* For tests, just fail the test */
     TEST_FAIL_MESSAGE("Com_Error was called");

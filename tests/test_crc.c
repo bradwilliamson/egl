@@ -10,11 +10,6 @@
 /* Include the actual implementation */
 #include "../common/common.h"
 
-/* Stubs for functions needed by common code */
-void Com_Printf(comPrint_t flags, char *fmt, ...) {
-    /* Silently ignore for tests */
-}
-
 void Sys_Error(char *error, ...) {
     /* For tests, just fail */
     TEST_FAIL_MESSAGE("Sys_Error was called");
