@@ -71,6 +71,7 @@ function Test-IsSystemDll {
         'comctl32.dll',
         'comdlg32.dll',
         'crypt32.dll',
+        'dbghelp.dll',
         'gdi32.dll',
         'hid.dll',
         'imm32.dll',
