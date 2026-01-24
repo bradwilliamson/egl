@@ -115,17 +115,17 @@ test_mathlib: test_mathlib.c $(SHARED_SRC) $(COM_STUBS)
 test_byteswap: test_byteswap.c ../shared/byteswap.c
 	$(CC) $(CFLAGS) -o $@ $< ../shared/byteswap.c
 
-test_net_msg: test_net_msg.c ../common/net_msg.c $(SHARED_SRC_NO_PLANE)
-	$(CC) $(CFLAGS) -o $@ $< ../common/net_msg.c $(SHARED_SRC_NO_PLANE) -lm
+test_net_msg: test_net_msg.c ../common/net_msg.c $(SHARED_SRC_NO_PLANE) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< ../common/net_msg.c $(SHARED_SRC_NO_PLANE) $(COM_STUBS) -lm
 
-test_string: test_string.c ../shared/string.c ../shared/shared.c
-	$(CC) $(CFLAGS) -o $@ $< ../shared/string.c ../shared/shared.c
+test_string: test_string.c ../shared/string.c ../shared/shared.c $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< ../shared/string.c ../shared/shared.c $(COM_STUBS)
 
-test_crc: test_crc.c ../common/crc.c ../shared/shared.c ../shared/string.c
-	$(CC) $(CFLAGS) -o $@ $< ../common/crc.c ../shared/shared.c ../shared/string.c
+test_crc: test_crc.c ../common/crc.c ../shared/shared.c ../shared/string.c $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< ../common/crc.c ../shared/shared.c ../shared/string.c $(COM_STUBS)
 
-test_infostrings: test_infostrings.c ../shared/infostrings.c ../shared/shared.c ../shared/string.c
-	$(CC) $(CFLAGS) -o $@ $< ../shared/infostrings.c ../shared/shared.c ../shared/string.c
+test_infostrings: test_infostrings.c ../shared/infostrings.c ../shared/shared.c ../shared/string.c $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< ../shared/infostrings.c ../shared/shared.c ../shared/string.c $(COM_STUBS)
 
 test_sdl_input: test_sdl_input.c
 	$(CC) $(CFLAGS) $(SDL2_CFLAGS) -o $@ $< $(SDL2_LIBS)
