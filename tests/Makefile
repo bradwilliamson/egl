@@ -93,10 +93,10 @@ all: $(TEST_BINS)
 ifeq ($(OS),Windows_NT)
 ci: clean all
 	@echo "=== Running tests (PowerShell) ==="
-	@powershell -NoProfile -Command "$${ErrorActionPreference}='Continue'; $$exit=0; $$bins=('$(TEST_BINS)' -split '\s+'); foreach($$t in $$bins){ if(-not $$t){ continue }; if(Test-Path ('.\\' + $$t)){ Write-Host ('Running ' + $$t + '...'); & ('.\\' + $$t) *> ($$t + '.log'); if($$LASTEXITCODE -ne 0){ $$exit=1 }; Get-Content ($$t + '.log') } elseif(Test-Path ('.\\' + $$t + '.exe')){ Write-Host ('Running ' + $$t + '...'); & ('.\\' + $$t + '.exe') *> ($$t + '.log'); if($$LASTEXITCODE -ne 0){ $$exit=1 }; Get-Content ($$t + '.log') } else { Write-Host ('SKIP: ' + $$t + ' not built') } }; exit $$exit"
+	@powershell -NoProfile -Command "\$$ErrorActionPreference='Continue'; \$$exit=0; \$$bins=('$(TEST_BINS)' -split '\s+'); foreach(\$$t in \$$bins){ if(-not \$$t){ continue }; if(Test-Path ('.\\' + \$$t)){ Write-Host ('Running ' + \$$t + '...'); & ('.\\' + \$$t) *> (\$$t + '.log'); if(\$$LASTEXITCODE -ne 0){ \$$exit=1 }; Get-Content (\$$t + '.log') } elseif(Test-Path ('.\\' + \$$t + '.exe')){ Write-Host ('Running ' + \$$t + '...'); & ('.\\' + \$$t + '.exe') *> (\$$t + '.log'); if(\$$LASTEXITCODE -ne 0){ \$$exit=1 }; Get-Content (\$$t + '.log') } else { Write-Host ('SKIP: ' + \$$t + ' not built') } }; exit \$$exit"
 
 clean:
-	@powershell -NoProfile -Command "$${ErrorActionPreference}='SilentlyContinue'; $$bins=('$(TEST_BINS)' -split '\s+'); foreach($$t in $$bins){ if(-not $$t){ continue }; Remove-Item -Force -ErrorAction SilentlyContinue $$t, ($$t + '.exe') }; Remove-Item -Force -ErrorAction SilentlyContinue *.o, *.log, 'test-output.log'; exit 0"
+	@powershell -NoProfile -Command "\$$ErrorActionPreference='SilentlyContinue'; \$$bins=('$(TEST_BINS)' -split '\s+'); foreach(\$$t in \$$bins){ if(-not \$$t){ continue }; Remove-Item -Force -ErrorAction SilentlyContinue \$$t, (\$$t + '.exe') }; Remove-Item -Force -ErrorAction SilentlyContinue *.o, *.log, 'test-output.log'; exit 0"
 else
 ci: clean
 	@echo "=== Building test binaries ==="
