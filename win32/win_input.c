@@ -1093,6 +1093,19 @@ void IN_Init (void)
 
 /*
 ===========
+IN_JoyRumbleTrigger
+
+Stub for joystick rumble on sound effects (not supported in win32 backend)
+===========
+*/
+void IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float volume)
+{
+	// Rumble not supported in win32 backend (only SDL2)
+}
+
+
+/*
+===========
 IN_Shutdown
 ===========
 */

@@ -60,7 +60,117 @@ static void	*cmd_menuVidSettings;
 
 static void	*cmd_menuQuit;
 
+static void	*cmd_pushmenu;
+
 static void	*cmd_startSStatus;
+
+/*
+=================
+UI_PushMenu_f
+
+Compatibility command used by shipped configs (e.g. "pushmenu servers +http://...").
+=================
+*/
+static void UI_PushMenu_f (void)
+{
+	int			argc;
+	const char	*menuName;
+	const char	*url;
+	int			i;
+
+	argc = cgi.Cmd_Argc ();
+	if (argc < 2) {
+		Com_Printf (0, "Usage: pushmenu <menu> [ +http(s)://url ]\n");
+		return;
+	}
+
+	menuName = cgi.Cmd_Argv (1);
+	if (!Q_strnicmp (menuName, "menu_", 5))
+		menuName += 5;
+
+	url = NULL;
+	for (i = 2; i < argc; i++) {
+		const char *arg = cgi.Cmd_Argv (i);
+		if (!arg || !arg[0])
+			continue;
+
+		if (arg[0] == '+')
+			arg++;
+
+		if (!Q_strnicmp (arg, "http://", 7) || !Q_strnicmp (arg, "https://", 8)) {
+			url = arg;
+			break;
+		}
+	}
+
+	if (!Q_stricmp (menuName, "servers") || !Q_stricmp (menuName, "serverbrowser")) {
+		if (url) {
+			cgi.Cvar_Set ("sb_master1", (char *)url, qFalse);
+			cgi.Cvar_Set ("sb_master2", "", qFalse);
+			cgi.Cvar_Set ("sb_master3", "", qFalse);
+			cgi.Cvar_Set ("sb_master4", "", qFalse);
+			cgi.Cvar_Set ("sb_usemasters", "1", qFalse);
+			cgi.Cvar_Set ("sb_uselan", "0", qFalse);
+		}
+
+		UI_ServerBrowserMenu_f ();
+		cgi.Cbuf_AddText ("sb_refresh\n");
+		return;
+	}
+
+	if (!Q_stricmp (menuName, "main"))
+		return UI_MainMenu_f ();
+	if (!Q_stricmp (menuName, "game"))
+		return UI_GameMenu_f ();
+	if (!Q_stricmp (menuName, "loadgame"))
+		return UI_LoadGameMenu_f ();
+	if (!Q_stricmp (menuName, "savegame"))
+		return UI_SaveGameMenu_f ();
+	if (!Q_stricmp (menuName, "credits"))
+		return UI_CreditsMenu_f ();
+	if (!Q_stricmp (menuName, "multiplayer"))
+		return UI_MultiplayerMenu_f ();
+	if (!Q_stricmp (menuName, "dloptions"))
+		return UI_DLOptionsMenu_f ();
+	if (!Q_stricmp (menuName, "joinserver"))
+		return UI_JoinServerMenu_f ();
+	if (!Q_stricmp (menuName, "addressbook"))
+		return UI_AddressBookMenu_f ();
+	if (!Q_stricmp (menuName, "playerconfig"))
+		return UI_PlayerConfigMenu_f ();
+	if (!Q_stricmp (menuName, "startserver"))
+		return UI_StartServerMenu_f ();
+	if (!Q_stricmp (menuName, "dmflags"))
+		return UI_DMFlagsMenu_f ();
+	if (!Q_stricmp (menuName, "options"))
+		return UI_OptionsMenu_f ();
+	if (!Q_stricmp (menuName, "controls"))
+		return UI_ControlsMenu_f ();
+	if (!Q_stricmp (menuName, "effects"))
+		return UI_EffectsMenu_f ();
+	if (!Q_stricmp (menuName, "gloom"))
+		return UI_GloomMenu_f ();
+	if (!Q_stricmp (menuName, "hud"))
+		return UI_HUDMenu_f ();
+	if (!Q_stricmp (menuName, "input"))
+		return UI_InputMenu_f ();
+	if (!Q_stricmp (menuName, "misc"))
+		return UI_MiscMenu_f ();
+	if (!Q_stricmp (menuName, "screen"))
+		return UI_ScreenMenu_f ();
+	if (!Q_stricmp (menuName, "sound"))
+		return UI_SoundMenu_f ();
+	if (!Q_stricmp (menuName, "video"))
+		return UI_VideoMenu_f ();
+	if (!Q_stricmp (menuName, "glexts"))
+		return UI_GLExtsMenu_f ();
+	if (!Q_stricmp (menuName, "vidsettings"))
+		return UI_VIDSettingsMenu_f ();
+	if (!Q_stricmp (menuName, "quit"))
+		return UI_QuitMenu_f ();
+
+	Com_Printf (0, "Unknown menu '%s' for pushmenu\n", menuName);
+}
 
 /*
 =============================================================================
@@ -122,6 +232,8 @@ void M_Init (void)
 
 	cmd_menuQuit		= cgi.Cmd_AddCommand ("menu_quit",			UI_QuitMenu_f,				"Opens the quit menu");
 
+	cmd_pushmenu		= cgi.Cmd_AddCommand ("pushmenu",			UI_PushMenu_f,				"Pushes a menu by name (compatibility)");
+
 	cmd_startSStatus	= cgi.Cmd_AddCommand ("ui_startSStatus",	JoinMenu_StartSStatus,		"");
 	Com_DevPrintf (0, "[cginit] M_Init commands registered\n");
 }
@@ -171,6 +283,8 @@ void M_Shutdown (void)
 	cgi.Cmd_RemoveCommand ("menu_vidsettings", cmd_menuVidSettings);
 
 	cgi.Cmd_RemoveCommand ("menu_quit", cmd_menuQuit);
+
+	cgi.Cmd_RemoveCommand ("pushmenu", cmd_pushmenu);
 
 	cgi.Cmd_RemoveCommand ("ui_startSStatus", cmd_startSStatus);
 }

@@ -105,9 +105,9 @@ static inline void R_TouchFont (font_t *font)
 
 	assert (font);
 
-	// Register the material(s)
+	// Register the material(s) with nearest-neighbor filtering for crisp font rendering
 	for (i=0, fs=font->fontSizes ; i<font->numSizes ; fs++, i++) {
-		fs->matPtr = R_RegisterPic (fs->matName);
+		fs->matPtr = R_RegisterFontPic (fs->matName);
 		if (!fs->matPtr)
 			Com_Printf (PRNT_ERROR, "R_TouchFont: could not locate material '%s'!\n", fs->matName);
 	}

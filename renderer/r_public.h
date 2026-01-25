@@ -212,6 +212,7 @@ void		R_ModelBounds (struct refModel_s *model, vec3_t mins, vec3_t maxs);
 //
 
 struct material_s *R_RegisterPic (char *name);
+struct material_s *R_RegisterFontPic (char *name);
 struct material_s *R_RegisterPoly (char *name);
 struct material_s *R_RegisterSkin (char *name);
 

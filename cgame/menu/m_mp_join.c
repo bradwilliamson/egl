@@ -296,6 +296,9 @@ qBool UI_ParseServerStatus (char *adr, char *info)
 	char			*token;
 	char			shortName[MAX_HOSTNAME_LEN];
 
+	// Forward to new server browser if active
+	ServerBrowser_AddFromStatusResponse(adr, info);
+
 	if (!cg.menuOpen || !m_joinServerMenu.frameWork.initialized)
 		return qFalse;
 	if (!info || !info[0])

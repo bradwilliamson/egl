@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 //
 
 #include "cl_local.h"
+#include "cl_serverbrowser.h"
+
+#include "cl_config_write.h"
 
 cVar_t	*cl_lightlevel;
 cVar_t	*cl_downloadToBase;
@@ -84,7 +87,42 @@ struct memPool_s	*cl_cinSysPool;
 struct memPool_s	*cl_guiSysPool;
 struct memPool_s	*cl_soundSysPool;
 
+static void	CL_WriteConfig_Default (void);
+
 //======================================================================
+
+/*
+===============
+CL_ClientShutdown
+
+FIXME: this is a callback from Sys_Quit Sys_Error and Com_Error. It would be better
+to run quit through here before the final handoff to the sys code.
+===============
+*/
+void CL_ClientShutdown (qBool error)
+{
+	static qBool isDown = qFalse;
+	if (isDown)
+		return;
+	isDown = qTrue;
+
+	// Best-effort persistence for CVAR_ARCHIVE settings (e.g. server browser favorites).
+	// Avoid writing config during error shutdowns to reduce noise/risk.
+	if (!error)
+		CL_WriteConfig_Default ();
+
+	SrvBrowser_Shutdown();
+
+#ifdef CL_HTTPDL
+	CL_HTTPDL_Cleanup (qTrue);
+#endif
+
+	CDAudio_Shutdown ();
+	Snd_Shutdown ();
+
+	IN_Shutdown ();
+	VID_Shutdown ();
+}
 
 /*
 ===================
@@ -901,17 +939,50 @@ static void CL_ConnectionlessPacket (void)
 	char		*cmd, *printStr;
 	netAdr_t	remote;
 	qBool		isPrint;
+	const byte *raw;
+	int rawLen;
 
 	MSG_BeginReading (&cls.netMessage);
 	assert (MSG_ReadLong (&cls.netMessage) == -1);	// Skip the -1
+
+	// Master server replies contain binary address/port bytes immediately after
+	// the ASCII prefix (e.g. "servers"), so they must be detected/handled
+	// before using MSG_ReadStringLine/Cmd_TokenizeString.
+	raw = cls.netMessage.data + cls.netMessage.readCount;
+	rawLen = (int)(cls.netMessage.curSize - cls.netMessage.readCount);
+	if (rawLen > 0) {
+		static const char pfxServers[] = "servers";
+		static const char pfxServersExt[] = "serversExt";
+		static const char pfxServers2[] = "servers2";
+		int pfxLen = 0;
+
+		if (rawLen >= (int)sizeof(pfxServers) - 1 && !memcmp(raw, pfxServers, sizeof(pfxServers) - 1))
+			pfxLen = (int)sizeof(pfxServers) - 1;
+		else if (rawLen >= (int)sizeof(pfxServersExt) - 1 && !memcmp(raw, pfxServersExt, sizeof(pfxServersExt) - 1))
+			pfxLen = (int)sizeof(pfxServersExt) - 1;
+		else if (rawLen >= (int)sizeof(pfxServers2) - 1 && !memcmp(raw, pfxServers2, sizeof(pfxServers2) - 1))
+			pfxLen = (int)sizeof(pfxServers2) - 1;
+
+		if (pfxLen) {
+			const byte *payload = raw + pfxLen;
+			size_t payloadLen = (size_t)(rawLen - pfxLen);
+			while (payloadLen && (*payload == ' ' || *payload == '\n' || *payload == '\r' || *payload == '\t')) {
+				payload++;
+				payloadLen--;
+			}
+			SrvBrowser_MasterServersResponse(&cls.netFrom, payload, payloadLen);
+			return;
+		}
+	}
 
 	cmd = MSG_ReadStringLine (&cls.netMessage);
 	Cmd_TokenizeString (cmd, qFalse);
 
 	cmd = Cmd_Argv (0);
 	
-	// Debug: show all incoming connectionless packets
-	Com_Printf (0, "CL_ConnectionlessPacket: received '%s' from %s\n", cmd, NET_AdrToString (&cls.netFrom));
+	// Debug: show incoming connectionless packets only when sb_debug>=2.
+	if (Cvar_GetIntegerValue("sb_debug") >= 2)
+		Com_Printf (0, "CL_ConnectionlessPacket: received '%s' from %s\n", cmd, NET_AdrToString (&cls.netFrom));
 
 	// Diagnostic: during a query-only getchallenge (challengequery), always accept
 	// the challenge reply so we can see advertised protocol extras, even when not
@@ -920,6 +991,8 @@ static void CL_ConnectionlessPacket (void)
 		CL_Challenge_CP ();
 		return;
 	}
+
+	// Master replies are handled above via raw-byte prefix detection.
 
 	// Handle critical connection commands before address filtering
 	if (!strcmp (cmd, "client_connect")) {
@@ -944,9 +1017,18 @@ static void CL_ConnectionlessPacket (void)
 		// Print command from somewhere
 		isPrint = qTrue;
 		printStr = MSG_ReadString (&cls.netMessage);
-		if (CL_CGModule_ParseServerStatus (NET_AdrToString (&cls.netFrom), printStr))
-			return;
-		Q_strncpyz (cls.serverMessage, printStr, sizeof (cls.serverMessage));
+		// Server status replies are carried in a connectionless "print" packet.
+		// Some servers prefix the infostring with a newline, so skip leading
+		// whitespace/newlines before checking for the '\\key\\value' format.
+		if (printStr && printStr[0]) {
+			char *p = printStr;
+			while (*p == '\n' || *p == '\r' || *p == ' ' || *p == '\t')
+				p++;
+			if (*p == '\\') {
+				SrvBrowser_StatusResponse (&cls.netFrom, p);
+				return;
+			}
+		}
 	}
 	else {
 		printStr = NULL;
@@ -1340,6 +1422,8 @@ void CL_Frame (int msec)
 
 	// Update the inputs (keyboard, mouse, server, etc)
 	CL_RefreshInputs ();
+
+	SrvBrowser_Frame ();
 
 	// Send commands to the server
 	if (cls.forcePacket || com_userInfoModified) {
@@ -2023,7 +2107,6 @@ CL_WriteConfig
 */
 static void CL_WriteConfig (void)
 {
-	FILE	*f;
 	char	path[MAX_QPATH];
 
 	Cvar_GetLatchedVars (CVAR_LATCH_AUDIO|CVAR_LATCH_SERVER|CVAR_LATCH_VIDEO|CVAR_RESET_GAMEDIR);
@@ -2035,23 +2118,22 @@ static void CL_WriteConfig (void)
 	else
 		Q_snprintfz (path, sizeof (path), "%s/eglcfg.cfg", FS_Gamedir ());
 
-	f = fopen (path, "wt");
-	if (!f) {
+	if (!CL_WriteConfigFile(path, Key_WriteBindings, Cvar_WriteVariables)) {
 		Com_Printf (PRNT_ERROR, "ERROR: Couldn't write %s\n", path);
 		return;
 	}
-
-	fprintf (f, "//\n// configuration file generated by EGL, modify at risk\n//\n");
-
-	fprintf (f, "\n// key bindings\n");
-	Key_WriteBindings (f);
-
-	fprintf (f, "\n// console variables\n");
-	Cvar_WriteVariables (f);
-
-	fprintf (f, "\n\0");
-	fclose (f);
 	Com_Printf (0, "Saved to %s\n", path);
+}
+
+static void CL_WriteConfig_Default (void)
+{
+	char	path[MAX_QPATH];
+
+	Cvar_GetLatchedVars (CVAR_LATCH_AUDIO|CVAR_LATCH_SERVER|CVAR_LATCH_VIDEO|CVAR_RESET_GAMEDIR);
+
+	Q_snprintfz (path, sizeof (path), "%s/eglcfg.cfg", FS_Gamedir ());
+
+	(void)CL_WriteConfigFile(path, Key_WriteBindings, Cvar_WriteVariables);
 }
 
 
@@ -2133,6 +2215,7 @@ static void CL_Register (void)
 	Cmd_AddCommand ("sstatus",			CL_ServerStatus_f,		"Sends a status request packet to a server");
 	Cmd_AddCommand ("stop",				CL_Stop_f,				"Stop recording a demo");
 	Cmd_AddCommand ("userinfo",			CL_Userinfo_f,			"");
+	Cmd_AddCommand ("menu_servers",		M_Menu_Servers_f,		"Open server browser menu");
 
 #if defined(CL_ANTICHEAT) && defined(_DEBUG)
 	Cmd_AddCommand ("initanticheat",	CL_ACAPI_Init,			"");
@@ -2189,38 +2272,8 @@ void CL_ClientInit (void)
 	// Touch memory
 	Mem_TouchGlobal ();
 
+	SrvBrowser_Init();
+
 	// Ready!
 	cls.disableScreen = qFalse;
-}
-
-
-/*
-===============
-CL_ClientShutdown
-
-FIXME: this is a callback from Sys_Quit Sys_Error and Com_Error. It would be better
-to run quit through here before the final handoff to the sys code.
-===============
-*/
-void CL_ClientShutdown (qBool error)
-{
-	static qBool isDown = qFalse;
-	if (isDown)
-		return;
-	isDown = qTrue;
-
-#ifdef CL_HTTPDL
-	CL_HTTPDL_Cleanup (qTrue);
-#endif
-
-	if (!error)
-		CL_WriteConfig ();
-
-	CL_CGameAPI_Shutdown ();
-
-	CDAudio_Shutdown ();
-	Snd_Shutdown ();
-
-	IN_Shutdown ();
-	VID_Shutdown ();
 }

@@ -1,6 +1,6 @@
 # EGL, an enhanced Quake II Engine
 Originally written by Echon.
-A backup of EGL 0.3.3, modernized from the original 0.3.1 QuakeSrc snapshot (circa 2007).
+A backup of EGL 0.3.4, modernized from the original 0.3.1 QuakeSrc snapshot (circa 2007).
 
 ## Modernization status
 
@@ -44,6 +44,15 @@ Use the helper:
 SDL2 backend build:
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\build.ps1 -j USE_SDL2=1`
+
+## Note: in-game UI lives in `cgame` modules
+
+Many “in-game UI” changes (including the multiplayer server browser under `cgame/menu/`) are compiled into the `cgame` module, not only the main engine executable.
+
+- Windows: make sure `baseq2\eglcgamex64.dll` is rebuilt and the updated DLL is what the game is loading.
+- Linux: same idea with `baseq2/eglcgame.so`.
+
+If you rebuild only `egl.exe`, you may see *no change in-game* because you’re still running an old `cgame` module.
 
 ## Packaging a portable folder (client + dedicated + data)
 

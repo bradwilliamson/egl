@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define MAX_LOCAL_SERVERS	24
 #define MAX_ADDRBOOK_SAVES	8
 #define MAX_SAVEGAMES		16
+#define MAX_STATUS_SERVERS	1024
 
 /*
 =============================================================================
@@ -44,6 +45,7 @@ void UI_MultiplayerMenu_f (void);
 		void UI_DLOptionsMenu_f (void);
 	void UI_JoinServerMenu_f (void);
 		void UI_AddressBookMenu_f (void);
+		void UI_ServerBrowserMenu_f (void);
 	void UI_PlayerConfigMenu_f (void);
 	void UI_StartServerMenu_f (void);
 		void UI_DMFlagsMenu_f (void);
@@ -102,6 +104,12 @@ void		M_PopMenu (void);
 
 qBool		UI_ParseServerInfo (char *adr, char *info);
 qBool		UI_ParseServerStatus (char *adr, char *info);
+
+//
+// m_mp_serverbrowser.c
+//
+
+qBool		ServerBrowser_AddFromStatusResponse(const char *address, const char *infostring);
 
 //
 // m_sp_loadgame.c

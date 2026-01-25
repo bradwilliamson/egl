@@ -60,9 +60,9 @@ void SDL2_SetMouseGrab (qBool grab)
     if (!sdl_window)
         return;
 
-    // Keep OS cursor from reappearing when the window is re-created (e.g. vid_restart)
-    // and relative mode is temporarily lost.
-    SDL_ShowCursor (grab ? SDL_DISABLE : SDL_ENABLE);
+    // The game renders its own cursor (menus) and uses relative mouse mode (game).
+    // Never show the OS cursor; it can otherwise flicker/blink due to focus/relative-mode transitions.
+    SDL_ShowCursor (SDL_DISABLE);
     SDL_SetRelativeMouseMode (grab ? SDL_TRUE : SDL_FALSE);
     SDL_SetWindowGrab (sdl_window, grab ? SDL_TRUE : SDL_FALSE);
 }
