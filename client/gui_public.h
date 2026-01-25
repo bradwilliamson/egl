@@ -84,4 +84,10 @@ qBool		GUIVar_GetVecValue (guiVar_t *var, vec4_t dest);
 void		GUIVar_SetFloatValue (guiVar_t *var, float value);
 void		GUIVar_SetStrValue (guiVar_t *var, char *value);
 void		GUIVar_SetVecValue (guiVar_t *var, vec4_t value);
+
+//
+// gui_servers.c
+//
+void		M_Menu_Servers_f (void);
+
 #endif // __GUI_PUBLIC_H__

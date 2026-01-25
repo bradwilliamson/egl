@@ -627,7 +627,10 @@ void SDL2_PollInputEvents (void)
 
         case SDL_MOUSEMOTION:
             /* SDL provides relative motion when in relative mouse mode */
-            if (sdl_mouseGrabbed)
+            // Always allow menu cursor movement (we grab/hide the OS cursor in KD_MENU).
+            if (Key_GetDest () == KD_MENU)
+                CL_MoveMouse (ev.motion.xrel, ev.motion.yrel);
+            else if (sdl_mouseGrabbed)
                 CL_MoveMouse (ev.motion.xrel, ev.motion.yrel);
             break;
 
@@ -768,6 +771,27 @@ void SDL2_PollInputEvents (void)
 /* Engine input hooks for SDL backend */
 void IN_Commands (void)
 {
+
+    // Keep grab state current even if IN_Frame() hasn't run yet this tick.
+    // Crucially: in menus, we always grab/hide the OS cursor so there's only one cursor
+    // and the UI receives consistent relative motion.
+    if (!sdl_appActive) {
+        SDL2_SetGrabState (qFalse);
+    }
+    else if (Key_GetDest () == KD_MENU) {
+        SDL2_SetGrabState (qTrue);
+    }
+    else if (!cls.refreshPrepped) {
+        SDL2_SetGrabState (qFalse);
+    }
+    else if ((Key_GetDest () == KD_CONSOLE || Key_GetDest () == KD_MESSAGE)
+        && !cls.refConfig.vidFullScreen) {
+        SDL2_SetGrabState (qFalse);
+    }
+    else {
+        SDL2_SetGrabState (qTrue);
+    }
+
     SDL2_PollInputEvents ();
 }
 

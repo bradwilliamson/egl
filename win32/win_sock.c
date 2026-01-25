@@ -338,36 +338,35 @@ qBool NET_GetPacket (netSrc_t sock, netAdr_t *fromAddr, netMsg_t *message)
 	if (!netSocket)
 		return qFalse;
 
-	fromLen = sizeof (fromSockAddr);
-	ret = recvfrom (netSocket, (char *)message->data, (int) message->maxSize, 0, (struct sockaddr *)&fromSockAddr, &fromLen);
+	// On Windows, UDP sockets can return WSAECONNRESET on recvfrom when an ICMP
+	// Port Unreachable was received for a previous sendto(). If we treat that as a
+	// hard read failure, it can starve real packets queued behind it (e.g. master
+	// server replies). Consume and retry.
+	for (;;) {
+		fromLen = sizeof (fromSockAddr);
+		ret = recvfrom (netSocket, (char *)message->data, (int) message->maxSize, 0, (struct sockaddr *)&fromSockAddr, &fromLen);
+		if (ret != -1)
+			break;
 
-	NET_SockAdrToNetAdr (&fromSockAddr, fromAddr);
-
-	if (ret == -1) {
 		error = WSAGetLastError();
 
 		switch (error) {
-		// wouldblock is silent
 		case WSAEWOULDBLOCK:
 			return qFalse;
-
-		// large packet
+		case WSAECONNRESET:
+			// Consume ICMP error and retry to read real queued packets.
+			continue;
 		case WSAEMSGSIZE:
-			Com_Printf (PRNT_WARNING, "WARNING: NET_GetPacket: Oversize packet from %s\n", NET_AdrToString (fromAddr));
+			// We don't have a reliable from-address on error; just warn.
+			Com_Printf (PRNT_WARNING, "WARNING: NET_GetPacket: Oversize packet\n");
+			return qFalse;
+		default:
+			Com_Printf (PRNT_WARNING, "NET_GetPacket: %s\n", NET_ErrorString (error));
 			return qFalse;
 		}
-
-#ifndef DEDICATED_ONLY
-		if (dedicated->intVal || error == WSAECONNRESET)
-#endif
-			Com_Printf (PRNT_WARNING, "NET_GetPacket: %s from %s\n", NET_ErrorString (error), NET_AdrToString (fromAddr));
-#ifndef DEDICATED_ONLY
-		else
-			Com_Printf (PRNT_ERROR, "NET_GetPacket: %s from %s\n", NET_ErrorString (error), NET_AdrToString (fromAddr));
-#endif
-
-		return qFalse;
 	}
+
+	NET_SockAdrToNetAdr (&fromSockAddr, fromAddr);
 
 	netStats.sizeIn += ret;
 	netStats.packetsIn++;

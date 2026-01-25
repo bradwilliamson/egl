@@ -3,7 +3,10 @@
 #   make ci      - build + run all tests (CI-friendly)
 #   make clean   - remove built test binaries and logs
 
-CC ?= gcc
+# Prefer gcc over make's built-in default 'cc', but allow overrides via env/CLI.
+ifeq ($(origin CC),default)
+CC = gcc
+endif
 
 CFLAGS += -Wall -Wextra -g -I.. -I../shared -I../common -I../unity -DTEST_BUILD
 CFLAGS += -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function
@@ -52,6 +55,9 @@ endif
 TEST_BINS = \
 	test_mathlib \
 	test_byteswap \
+	test_serverbrowser_ui \
+	test_favorites_persistence \
+	test_config_write \
 	test_net_msg \
 	test_string \
 	test_crc \
@@ -84,6 +90,14 @@ TEST_BINS = \
 all: $(TEST_BINS)
 
 # CI target - returns proper exit code and writes per-test logs
+ifeq ($(OS),Windows_NT)
+ci: clean all
+	@echo "=== Running tests (PowerShell) ==="
+	@powershell -NoProfile -Command "\$$ErrorActionPreference='Continue'; \$$exit=0; \$$bins=('$(TEST_BINS)' -split '\s+'); foreach(\$$t in \$$bins){ if(-not \$$t){ continue }; if(Test-Path ('.\\' + \$$t)){ Write-Host ('Running ' + \$$t + '...'); & ('.\\' + \$$t) *> (\$$t + '.log'); if(\$$LASTEXITCODE -ne 0){ \$$exit=1 }; Get-Content (\$$t + '.log') } elseif(Test-Path ('.\\' + \$$t + '.exe')){ Write-Host ('Running ' + \$$t + '...'); & ('.\\' + \$$t + '.exe') *> (\$$t + '.log'); if(\$$LASTEXITCODE -ne 0){ \$$exit=1 }; Get-Content (\$$t + '.log') } else { Write-Host ('SKIP: ' + \$$t + ' not built') } }; exit \$$exit"
+
+clean:
+	@powershell -NoProfile -Command "\$$ErrorActionPreference='SilentlyContinue'; \$$bins=('$(TEST_BINS)' -split '\s+'); foreach(\$$t in \$$bins){ if(-not \$$t){ continue }; Remove-Item -Force -ErrorAction SilentlyContinue \$$t, (\$$t + '.exe') }; Remove-Item -Force -ErrorAction SilentlyContinue *.o, *.log, 'test-output.log'; exit 0"
+else
 ci: clean
 	@echo "=== Building test binaries ==="
 	@echo "SDL2_CFLAGS: $(SDL2_CFLAGS)"
@@ -106,6 +120,7 @@ ci: clean
 
 clean:
 	rm -f $(TEST_BINS) *.o *.log test-output.log
+endif
 
 # Individual test targets
 
@@ -114,6 +129,15 @@ test_mathlib: test_mathlib.c $(SHARED_SRC) $(COM_STUBS)
 
 test_byteswap: test_byteswap.c ../shared/byteswap.c
 	$(CC) $(CFLAGS) -o $@ $< ../shared/byteswap.c
+
+test_serverbrowser_ui: test_serverbrowser_ui.c ../cgame/menu/sb_layout.c
+	$(CC) $(CFLAGS) -I../cgame/menu -o $@ $< ../cgame/menu/sb_layout.c
+
+test_favorites_persistence: test_favorites_persistence.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+test_config_write: test_config_write.c ../client/cl_config_write.c
+	$(CC) $(CFLAGS) -I../client -o $@ $< ../client/cl_config_write.c
 
 test_net_msg: test_net_msg.c ../common/net_msg.c $(SHARED_SRC_NO_PLANE) $(COM_STUBS)
 	$(CC) $(CFLAGS) -o $@ $< ../common/net_msg.c $(SHARED_SRC_NO_PLANE) $(COM_STUBS) -lm

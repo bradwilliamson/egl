@@ -37,6 +37,7 @@ typedef struct m_multiPlayerMenu_s {
 
 	uiImage_t			banner;
 
+	uiAction_t			joononline_menu;
 	uiAction_t			joinservers_menu;
 	uiAction_t			startserver_menu;
 	uiAction_t			plyrcfg_menu;
@@ -46,6 +47,11 @@ typedef struct m_multiPlayerMenu_s {
 } m_multiPlayerMenu_t;
 
 static m_multiPlayerMenu_t	m_multiPlayerMenu;
+
+static void JoinOnline_Menu (void *unused)
+{
+	UI_ServerBrowserMenu_f();
+}
 
 static void JoinServer_Menu (void *unused)
 {
@@ -82,9 +88,14 @@ static void MultiplayerMenu_Init (void)
 	m_multiPlayerMenu.banner.generic.name		= NULL;
 	m_multiPlayerMenu.banner.mat				= uiMedia.banners.multiplayer;
 
+	m_multiPlayerMenu.joononline_menu.generic.type		= UITYPE_ACTION;
+	m_multiPlayerMenu.joononline_menu.generic.flags		= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
+	m_multiPlayerMenu.joononline_menu.generic.name		= "Join Online Servers";
+	m_multiPlayerMenu.joononline_menu.generic.callBack	= JoinOnline_Menu;
+
 	m_multiPlayerMenu.joinservers_menu.generic.type		= UITYPE_ACTION;
 	m_multiPlayerMenu.joinservers_menu.generic.flags	= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
-	m_multiPlayerMenu.joinservers_menu.generic.name		= "Join Network Server";
+	m_multiPlayerMenu.joinservers_menu.generic.name		= "Join LAN Server";
 	m_multiPlayerMenu.joinservers_menu.generic.callBack	= JoinServer_Menu;
 
 	m_multiPlayerMenu.startserver_menu.generic.type		= UITYPE_ACTION;
@@ -97,11 +108,6 @@ static void MultiplayerMenu_Init (void)
 	m_multiPlayerMenu.plyrcfg_menu.generic.name		= "Player Configuration";
 	m_multiPlayerMenu.plyrcfg_menu.generic.callBack	= PlayerSetup_Menu;
 
-	m_multiPlayerMenu.dlopts_menu.generic.type		= UITYPE_ACTION;
-	m_multiPlayerMenu.dlopts_menu.generic.flags		= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
-	m_multiPlayerMenu.dlopts_menu.generic.name		= "Download Options";
-	m_multiPlayerMenu.dlopts_menu.generic.callBack	= DLOpts_Menu;
-
 	m_multiPlayerMenu.back_action.generic.type		= UITYPE_ACTION;
 	m_multiPlayerMenu.back_action.generic.flags		= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
 	m_multiPlayerMenu.back_action.generic.name		= "< Back";
@@ -110,6 +116,7 @@ static void MultiplayerMenu_Init (void)
 
 	UI_AddItem (&m_multiPlayerMenu.frameWork,		&m_multiPlayerMenu.banner);
 
+	UI_AddItem (&m_multiPlayerMenu.frameWork,		&m_multiPlayerMenu.joononline_menu);
 	UI_AddItem (&m_multiPlayerMenu.frameWork,		&m_multiPlayerMenu.joinservers_menu);
 	UI_AddItem (&m_multiPlayerMenu.frameWork,		&m_multiPlayerMenu.startserver_menu);
 	UI_AddItem (&m_multiPlayerMenu.frameWork,		&m_multiPlayerMenu.plyrcfg_menu);
@@ -154,8 +161,10 @@ static void MultiplayerMenu_Draw (void)
 
 	y = m_multiPlayerMenu.banner.height * UI_SCALE;
 
+	m_multiPlayerMenu.joononline_menu.generic.x		= 0;
+	m_multiPlayerMenu.joononline_menu.generic.y		= y += UIFT_SIZEINC;
 	m_multiPlayerMenu.joinservers_menu.generic.x	= 0;
-	m_multiPlayerMenu.joinservers_menu.generic.y	= y += UIFT_SIZEINC;
+	m_multiPlayerMenu.joinservers_menu.generic.y	= y += UIFT_SIZEINCLG;
 	m_multiPlayerMenu.startserver_menu.generic.x	= 0;
 	m_multiPlayerMenu.startserver_menu.generic.y	= y += UIFT_SIZEINCLG;
 	m_multiPlayerMenu.plyrcfg_menu.generic.x		= 0;

@@ -24,16 +24,16 @@ else
 SDL2_SOURCES =
 endif
 CFLAGS += -DWIN32 -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
-LDFLAGS += -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
+LDFLAGS += -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lwinhttp -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
 
 # Optional debug build (symbols + no optimization) for diagnosing crashes.
 DBG_CFLAGS = -DWIN32 -m64 -O0 -g3 -fno-omit-frame-pointer -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
-DBG_LDFLAGS = -m64 -mwindows -Wl,--pdb=egl.pdb -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
+DBG_LDFLAGS = -m64 -mwindows -Wl,--pdb=egl.pdb -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lwinhttp -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
 
 # Dedicated server build (no renderer/client). Uses separate objects to avoid flag collisions.
 DED_OBJDIR = build/dedicated
 DED_CFLAGS = -DWIN32 -DDEDICATED_ONLY -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./server -I./win32
-DED_LDFLAGS = -m64 -mwindows -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lole32 -luuid -lz -lminizip -ldbghelp
+DED_LDFLAGS = -m64 -mwindows -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lwinhttp -lole32 -luuid -lz -lminizip -ldbghelp
 
 # Module naming follows win32/win_main.c (LIBARCH = x64 for this toolchain)
 LIBARCH = x64

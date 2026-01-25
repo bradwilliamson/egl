@@ -106,6 +106,8 @@ anticheat.txt
 /debug_output.txt
 /tools/parse_frame_tmp.py
 /egl_*_debug.txt
+temp_backup_draw.txt
+*.tmp
 
 # Local one-off repo analysis docs
 /CODE_HEALTH_ANALYSIS.md
@@ -130,6 +132,17 @@ test_*_output*.txt
 /tests/*.log
 /tests/test-output.log
 
+# Local test runner artifacts (stdout/stderr captures)
+/tests/out.txt
+/tests/err.txt
+
+# Local CI log bundles
+/_ci_logs_linux/
+/_ci_logs_windows/
+
+# Local build logs
+/buildlog.txt
+
 # Local virtual environments
 .venv/
 
@@ -137,3 +150,6 @@ test_*_output*.txt
 /arena/
 /rails/
 /xatrix/
+
+# Local high-size binary content (not required to build)
+/expert/

@@ -3034,6 +3034,78 @@ material_t *R_RegisterPic (char *name)
 	return R_RegisterMaterial (name, qFalse, MAT_RT_PIC, -1);
 }
 
+material_t *R_RegisterFontPic (char *name)
+{
+	// Register font images with nearest-neighbor filtering for crisp rendering.
+	// Use a distinct internal material name so we don't collide with normal pics,
+	// and so we can safely reuse it across repeated touches (e.g. vid_restart).
+	image_t		*image;
+	material_t	*mat;
+	matPass_t	*pass;
+	int			texFlags;
+	char		fixedName[MAX_QPATH];
+	char		baseName[MAX_QPATH];
+	char		matName[MAX_QPATH];
+
+	if (!name || !name[0])
+		return NULL;
+	if (strlen(name)+1 >= MAX_QPATH) {
+		Com_Printf (PRNT_ERROR, "R_RegisterFontPic: Material name too long!\n");
+		return NULL;
+	}
+
+	Com_NormalizePath (fixedName, sizeof (fixedName), name);
+	Com_StripExtension (baseName, sizeof (baseName), fixedName);
+	Q_snprintfz (matName, sizeof (matName), "%s#font", baseName);
+
+	// See if it's already loaded.
+	mat = R_FindMaterial (matName, -1);
+	if (mat) {
+		R_ReadyMaterial (mat);
+		return mat;
+	}
+
+	texFlags = IF_NOMIPMAP_NEAREST|IF_NOPICMIP|IF_NOINTENS;
+	if (!vid_gammapics->intVal)
+		texFlags |= IF_NOGAMMA;
+
+	if (!(image = R_RegisterImage (fixedName, texFlags)))
+		return NULL;
+
+	mat = R_NewMaterial (matName, MAT_PATHTYPE_INTERNAL);
+	if (!mat)
+		return NULL;
+	mat->sizeBase = 0;
+	mat->surfParams = -1;
+	mat->flags = 0;
+
+	mat->cullType = MAT_CULL_NONE;
+	mat->features = MF_STCOORDS|MF_COLORS;
+	mat->passes = Mem_PoolAlloc (sizeof (matPass_t), ri.matSysPool, 0);
+	memset (mat->passes, 0, sizeof (matPass_t));
+	mat->numPasses = 1;
+	mat->sortKey = MAT_SORT_ADDITIVE;
+
+	pass = &mat->passes[0];
+	pass->animNames[pass->animNumNames] = Mem_PoolStrDup (fixedName, ri.matSysPool, 0);
+	pass->animTexFlags[pass->animNumNames] = texFlags;
+	pass->animImages[pass->animNumNames++] = image;
+	pass->flags = MAT_PASS_BLEND;
+	pass->blendSource = GL_SRC_ALPHA;
+	pass->blendDest = GL_ONE_MINUS_SRC_ALPHA;
+	pass->blendMode = GL_MODULATE;
+
+	pass->depthFunc = GL_LEQUAL;
+	pass->rgbGen.type = RGB_GEN_EXACT_VERTEX;
+	pass->alphaGen.type = ALPHA_GEN_VERTEX;
+	pass->tcGen = TC_GEN_BASE;
+	pass->canAccumulate = qFalse;
+	R_PassStateBits (pass);
+
+	R_ReadyMaterial (mat);
+	return mat;
+}
+
 material_t *R_RegisterPoly (char *name)
 {
 	return R_RegisterMaterial (name, qFalse, MAT_RT_POLY, -1);
