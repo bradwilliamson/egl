@@ -89,6 +89,7 @@ function Test-IsSystemDll {
         'ucrtbase.dll',
         'user32.dll',
         'version.dll',
+        'winhttp.dll',
         'winmm.dll',
         'ws2_32.dll',
         'wsock32.dll'
