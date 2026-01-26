@@ -407,11 +407,23 @@ static void SDL2_UpdateControllerEnabled (void)
     if (!in_joystick)
         return;
 
+    qBool wantUpdate = qFalse;
+
     if (in_joystick->modified) {
         in_joystick->modified = qFalse;
+        wantUpdate = qTrue;
+    }
+
+    if (in_joystick_auto && in_joystick_auto->modified) {
+        in_joystick_auto->modified = qFalse;
+        wantUpdate = qTrue;
+    }
+
+    if (wantUpdate) {
 
         if (in_joystick->intVal) {
-            SDL2_OpenFirstController ();
+            if (!SDL2_OpenFirstController ())
+                Com_Printf (PRNT_WARNING, "Gamepad: no compatible SDL2 GameController detected. If your controller was connected after launch, try unplug/replug; otherwise you may need an SDL mapping.\n");
         }
         else {
             SDL2_CloseController ();
