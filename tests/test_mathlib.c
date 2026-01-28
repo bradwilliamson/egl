@@ -135,11 +135,62 @@ void test_ColorNormalizef_all_zeros(void) {
     float in[3] = {0.0f, 0.0f, 0.0f};
     float out[3];
     float scale = ColorNormalizef(in, out);
-    
+
     /* Zero color should remain zero */
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out[0]);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out[1]);
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out[2]);
+    /* Scale should be 1.0 (no components > 1.0) */
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, scale);
+}
+
+void test_ColorNormalizef_returns_scale(void) {
+    /* Verify the actual scale factor returned matches 1/max */
+    float in[3] = {4.0f, 2.0f, 1.0f};
+    float out[3];
+    float scale = ColorNormalizef(in, out);
+
+    /* Max component is 4.0, so scale = 1/4 = 0.25 */
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.25f, scale);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, out[0]);   /* 4.0 * 0.25 = 1.0 */
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, out[1]);   /* 2.0 * 0.25 = 0.5 */
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.25f, out[2]);  /* 1.0 * 0.25 = 0.25 */
+}
+
+void test_ColorNormalizef_large_values(void) {
+    /* Large overbright color */
+    float in[3] = {10.0f, 5.0f, 2.5f};
+    float out[3];
+    float scale = ColorNormalizef(in, out);
+
+    /* Max is 10.0, scale = 1/10 = 0.1 */
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.1f, scale);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, out[0]);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, out[1]);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.25f, out[2]);
+}
+
+void test_ColorNormalizef_exactly_one(void) {
+    /* Max component is exactly 1.0 — should pass through */
+    float in[3] = {1.0f, 0.5f, 0.0f};
+    float out[3];
+    float scale = ColorNormalizef(in, out);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, scale);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, out[0]);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, out[1]);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, out[2]);
+}
+
+void test_ColorNormalizef_just_over_one(void) {
+    /* Max component is 1.01 — should trigger scaling */
+    float in[3] = {1.01f, 0.5f, 0.0f};
+    float out[3];
+    float scale = ColorNormalizef(in, out);
+
+    TEST_ASSERT_TRUE(scale < 1.0f);
+    /* Output max should be ~1.0 */
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 1.0f, out[0]);
 }
 
 /*
@@ -1404,6 +1455,10 @@ int main(void) {
     RUN_TEST(test_ColorNormalizef_already_normalized);
     RUN_TEST(test_ColorNormalizef_needs_scaling);
     RUN_TEST(test_ColorNormalizef_all_zeros);
+    RUN_TEST(test_ColorNormalizef_returns_scale);
+    RUN_TEST(test_ColorNormalizef_large_values);
+    RUN_TEST(test_ColorNormalizef_exactly_one);
+    RUN_TEST(test_ColorNormalizef_just_over_one);
     
     /* Vector macros */
     RUN_TEST(test_Vec3Copy);

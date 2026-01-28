@@ -77,7 +77,8 @@ TEST_BINS = \
 	test_pmove_quantization \
 	test_bounds \
 	test_plane \
-	test_mat_quat
+	test_mat_quat \
+	test_angles
 
 .PHONY: all ci clean
 
@@ -191,4 +192,7 @@ test_plane: test_plane.c $(SHARED_SRC) $(COM_STUBS)
 	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
 
 test_mat_quat: test_mat_quat.c $(SHARED_SRC) $(COM_STUBS)
+	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
+
+test_angles: test_angles.c $(SHARED_SRC) $(COM_STUBS)
 	$(CC) $(CFLAGS) -o $@ $< $(SHARED_SRC) $(COM_STUBS) -lm
