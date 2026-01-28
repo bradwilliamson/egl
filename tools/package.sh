@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 # Portable staging for Linux/Unix builds.
 # Produces: out/egl-linux/ with ./egl, ./eglded, and baseq2/*
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT_DIR/out/egl-linux"
 BASEQ2_OUT="$OUT_DIR/baseq2"
 
@@ -16,8 +16,9 @@ mkdir -p "$BASEQ2_OUT"
 
 # Build
 make -f "$MAKEFILE" -C "$ROOT_DIR" clean
-make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" USE_SDL2=1 all
-make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" USE_SDL2=1 dedicated
+JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$JOBS" USE_SDL2=1 all
+make -f "$MAKEFILE" -C "$ROOT_DIR" -j"$JOBS" USE_SDL2=1 dedicated
 
 # Stage binaries
 cp -f "$ROOT_DIR/egl" "$OUT_DIR/egl"

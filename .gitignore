@@ -71,6 +71,9 @@ eglded
 # VS Code (optional: keep if you commit workspace settings)
 .vscode/
 
+# Cursor (local index/skip rules; do not commit)
+.cursorignore
+
 # Clangd/IntelliSense helpers (optional)
 compile_commands.json
 .cache/

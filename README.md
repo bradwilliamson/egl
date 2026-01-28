@@ -111,6 +111,24 @@ To stage a portable folder under `out/egl-linux/`:
 
 Then copy your Quake II `pak0.pak` into `out/egl-linux/baseq2/`.
 
+### Building on Linux via Docker (from Windows)
+
+If you have Docker Desktop + WSL2, you can build Linux binaries without a native Linux install by running the build inside an Ubuntu container:
+
+- Build client + modules + dedicated:
+  - `bash tools/docker-build-linux.sh`
+-  - PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\\docker-build-linux.ps1`
+- Run unit tests:
+  - `bash tools/docker-test-linux.sh`
+-  - PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\\docker-test-linux.ps1`
+- Build + stage the portable folder:
+  - `bash tools/docker-package-linux.sh`
+-  - PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\\docker-package-linux.ps1`
+
+You can override the container image (e.g. test a different Ubuntu version) via:
+
+- `EGL_DOCKER_IMAGE=ubuntu:24.04 bash tools/docker-build-linux.sh`
+
 ## macOS status
 
 There is no native macOS platform layer in this repo right now (the Unix code here targets X11/GLX).

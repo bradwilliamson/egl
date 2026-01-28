@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config libjpeg-dev libpng-dev libminizip-dev zip
+          sudo apt-get install -y build-essential libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev pkg-config libjpeg-dev libpng-dev libminizip-dev zip libcurl4-openssl-dev
 
       - name: Build + stage portable folder (Linux)
         run: |

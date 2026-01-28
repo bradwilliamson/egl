@@ -21,7 +21,16 @@ CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing 
 # -lXrandr is added to support modern mode switching and gamma on X11.
 # -ldl is required for dlopen() (modules + OpenAL loader).
 LDFLAGS_COMMON = -ldl -lm -lz -lminizip -ljpeg -lpng
+
+# libcurl for HTTP master server fetching (client only)
+CURL_CFLAGS := $(shell pkg-config --cflags libcurl 2>/dev/null)
+CURL_LIBS := $(shell pkg-config --libs libcurl 2>/dev/null)
+ifeq ($(CURL_LIBS),)
+  CURL_LIBS := -lcurl
+endif
+CFLAGS_COMMON += $(CURL_CFLAGS)
 LDFLAGS_CLIENT = -lX11 -lGL -lXrandr $(LDFLAGS_COMMON)
+LDFLAGS_CLIENT += $(CURL_LIBS)
 
 # Dedicated build (no renderer/client)
 DED_CFLAGS = $(OPT_CFLAGS) $(WARN_CFLAGS) -DDEDICATED_ONLY -fno-strict-aliasing \

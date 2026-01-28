@@ -108,6 +108,12 @@ static void MultiplayerMenu_Init (void)
 	m_multiPlayerMenu.plyrcfg_menu.generic.name		= "Player Configuration";
 	m_multiPlayerMenu.plyrcfg_menu.generic.callBack	= PlayerSetup_Menu;
 
+	m_multiPlayerMenu.dlopts_menu.generic.type		= UITYPE_ACTION;
+	m_multiPlayerMenu.dlopts_menu.generic.flags		= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
+	m_multiPlayerMenu.dlopts_menu.generic.name		= "Download Options";
+	m_multiPlayerMenu.dlopts_menu.generic.callBack	= DLOpts_Menu;
+	m_multiPlayerMenu.dlopts_menu.generic.statusBar	= "Configure server download settings (maps/models/sounds/skins)";
+
 	m_multiPlayerMenu.back_action.generic.type		= UITYPE_ACTION;
 	m_multiPlayerMenu.back_action.generic.flags		= UIF_CENTERED|UIF_LARGE|UIF_SHADOW;
 	m_multiPlayerMenu.back_action.generic.name		= "< Back";

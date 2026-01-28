@@ -573,6 +573,36 @@ static DWORD	joy_NumButtons;
 
 static JOYINFOEX	ji;
 
+static void IN_UpdateJoystickEnabled (void)
+{
+	static uint32 nextRetryTime = 0;
+
+	if (!in_joystick)
+		return;
+
+	if (in_joystick->modified) {
+		in_joystick->modified = qFalse;
+
+		// If the user just enabled joystick/gamepad support and we didn't
+		// have a device at startup, try to (re)detect it immediately.
+		if (in_joystick->intVal && !joy_Avail) {
+			IN_StartupJoystick ();
+			nextRetryTime = Sys_UMilliseconds () + 2000;
+		}
+		return;
+	}
+
+	// If a controller is connected after launch, WinMM doesn't notify us.
+	// Retry occasionally while enabled until we detect one.
+	if (in_joystick->intVal && !joy_Avail) {
+		uint32 now = Sys_UMilliseconds ();
+		if (now >= nextRetryTime) {
+			IN_StartupJoystick ();
+			nextRetryTime = now + 5000;
+		}
+	}
+}
+
 /*
 =============== 
 IN_StartupJoystick 
@@ -963,6 +993,8 @@ void IN_Frame (void)
 	if (!in_mInitialized)
 		return;
 
+	IN_UpdateJoystickEnabled ();
+
 	if (!sys_winInfo.appActive) {
 		IN_DeactivateMouse ();
 		return;
@@ -1002,6 +1034,8 @@ void IN_Move (userCmd_t *cmd)
 {
 	if (!sys_winInfo.appActive)
 		return;
+
+	IN_UpdateJoystickEnabled ();
 
 	IN_MouseMove (cmd);
 	IN_JoyMove (cmd);

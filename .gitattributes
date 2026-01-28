@@ -1,0 +1,2 @@
+# Ensure shell scripts keep LF endings on Windows checkouts.
+*.sh text eol=lf

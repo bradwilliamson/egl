@@ -102,7 +102,7 @@ static void ApplyGamepadBindsFunc (void *unused)
 static void ApplyGamepadBindsZoomFunc (void *unused)
 {
 	if (m_inputMenu.apply_gamepad_binds_zoom_action.curValue == 1) {
-		cgi.Cbuf_InsertText ("joy_bind_defaults -zoom\n");
+		cgi.Cbuf_InsertText ("joy_bind_defaults -classic\n");
 	}
 }
 
@@ -313,13 +313,13 @@ static void InputMenu_Init (void)
 	m_inputMenu.apply_gamepad_binds_action.generic.name		= "Apply gamepad defaults";
 	m_inputMenu.apply_gamepad_binds_action.generic.callBack	= ApplyGamepadBindsFunc;
 	m_inputMenu.apply_gamepad_binds_action.itemNames			= yesno_names;
-	m_inputMenu.apply_gamepad_binds_action.generic.statusBar	= "Apply default gamepad binds (won't overwrite existing binds)";
+	m_inputMenu.apply_gamepad_binds_action.generic.statusBar	= "Apply default gamepad binds (Fortnite-ish; LT=zoom; won't overwrite existing binds)";
 
 	m_inputMenu.apply_gamepad_binds_zoom_action.generic.type		= UITYPE_SPINCONTROL;
-	m_inputMenu.apply_gamepad_binds_zoom_action.generic.name		= "Apply defaults (LT=zoom)";
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.name		= "Apply classic (LT=use)";
 	m_inputMenu.apply_gamepad_binds_zoom_action.generic.callBack	= ApplyGamepadBindsZoomFunc;
 	m_inputMenu.apply_gamepad_binds_zoom_action.itemNames			= yesno_names;
-	m_inputMenu.apply_gamepad_binds_zoom_action.generic.statusBar	= "Apply default gamepad binds with LT=zoom (won't overwrite existing binds)";
+	m_inputMenu.apply_gamepad_binds_zoom_action.generic.statusBar	= "Apply classic gamepad binds with LT=use (won't overwrite existing binds)";
 
 	m_inputMenu.clear_gamepad_binds_action.generic.type		= UITYPE_SPINCONTROL;
 	m_inputMenu.clear_gamepad_binds_action.generic.name		= "Clear gamepad binds";

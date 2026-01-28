@@ -251,6 +251,132 @@ static qBool CL_HTTPFetch_WinHTTP(const char *url, byte **outData, size_t *outLe
 
 #endif // _WIN32
 
+#ifndef _WIN32
+
+#include <curl/curl.h>
+
+typedef struct {
+	byte *buf;
+	size_t len;
+	size_t cap;
+} cl_httpfetch_buf_t;
+
+static size_t CL_HTTPFetch_Curl_Write(void *contents, size_t size, size_t nmemb, void *userp)
+{
+	cl_httpfetch_buf_t *b = (cl_httpfetch_buf_t *)userp;
+	size_t add = size * nmemb;
+	byte *newBuf;
+	if (!b || !add)
+		return add;
+
+	if (b->len + add + 1 > b->cap) {
+		size_t newCap = b->cap ? b->cap : 4096;
+		while (newCap < b->len + add + 1)
+			newCap *= 2;
+		newBuf = Mem_Alloc(newCap);
+		if (b->buf && b->cap)
+			memcpy(newBuf, b->buf, b->len);
+		if (b->buf)
+			Mem_Free(b->buf);
+		b->buf = newBuf;
+		b->cap = newCap;
+	}
+
+	memcpy(b->buf + b->len, contents, add);
+	b->len += add;
+	b->buf[b->len] = 0;
+	return add;
+}
+
+static qBool CL_HTTPFetch_Curl(const char *url, byte **outData, size_t *outLen, char *errBuf, size_t errBufSize)
+{
+	CURL *curl = NULL;
+	CURLcode res;
+	long httpCode = 0;
+	char curlErr[CURL_ERROR_SIZE];
+	struct curl_slist *headers = NULL;
+	cl_httpfetch_buf_t b;
+	qBool ok = qFalse;
+
+	memset(&b, 0, sizeof(b));
+	if (outData)
+		*outData = NULL;
+	if (outLen)
+		*outLen = 0;
+	if (!url || !url[0]) {
+		CL_HTTPFetch_SetErr(errBuf, errBufSize, "Empty URL");
+		return qFalse;
+	}
+
+	memset(curlErr, 0, sizeof(curlErr));
+
+	if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
+		CL_HTTPFetch_SetErr(errBuf, errBufSize, "curl_global_init failed");
+		return qFalse;
+	}
+
+	curl = curl_easy_init();
+	if (!curl) {
+		CL_HTTPFetch_SetErr(errBuf, errBufSize, "curl_easy_init failed");
+		goto done;
+	}
+
+	headers = curl_slist_append(headers, "Accept-Encoding: identity");
+	headers = curl_slist_append(headers, "Cache-Control: no-cache");
+	headers = curl_slist_append(headers, "Pragma: no-cache");
+
+	(void)curl_easy_setopt(curl, CURLOPT_URL, url);
+	(void)curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+	(void)curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+	(void)curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+	(void)curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 4000L);
+	(void)curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 8000L);
+	(void)curl_easy_setopt(curl, CURLOPT_USERAGENT, "EGL/1.0");
+	(void)curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	(void)curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CL_HTTPFetch_Curl_Write);
+	(void)curl_easy_setopt(curl, CURLOPT_WRITEDATA, &b);
+	(void)curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlErr);
+	(void)curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+	res = curl_easy_perform(curl);
+	if (res != CURLE_OK) {
+		CL_HTTPFetch_SetErr(errBuf, errBufSize, "%s", curlErr[0] ? curlErr : curl_easy_strerror(res));
+		goto done;
+	}
+
+	(void)curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+	if (httpCode != 200) {
+		CL_HTTPFetch_SetErr(errBuf, errBufSize, "HTTP status %ld", httpCode);
+		goto done;
+	}
+
+	if (!b.buf) {
+		b.buf = Mem_Alloc(1);
+		b.buf[0] = 0;
+		b.len = 0;
+		b.cap = 1;
+	}
+
+	if (outData)
+		*outData = b.buf;
+	if (outLen)
+		*outLen = b.len;
+	b.buf = NULL;
+	ok = qTrue;
+
+done:
+	if (b.buf)
+		Mem_Free(b.buf);
+	if (headers)
+		curl_slist_free_all(headers);
+	if (curl)
+		curl_easy_cleanup(curl);
+	curl_global_cleanup();
+	return ok;
+}
+
+#endif // !_WIN32
+
 qBool CL_HTTPFetch(const char *url, byte **outData, size_t *outLen, char *errBuf, size_t errBufSize)
 {
 	if (outData)
@@ -263,7 +389,6 @@ qBool CL_HTTPFetch(const char *url, byte **outData, size_t *outLen, char *errBuf
 #ifdef _WIN32
 	return CL_HTTPFetch_WinHTTP(url, outData, outLen, errBuf, errBufSize);
 #else
-	CL_HTTPFetch_SetErr(errBuf, errBufSize, "HTTP fetch not supported on this platform/build");
-	return qFalse;
+	return CL_HTTPFetch_Curl(url, outData, outLen, errBuf, errBufSize);
 #endif
 }
