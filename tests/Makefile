@@ -106,6 +106,40 @@ all: $(TEST_BINS)
 # CI target - returns proper exit code and writes per-test logs
 ifeq ($(OS),Windows_NT)
 
+# On Windows, support two environments:
+# - Native cmd/PowerShell (no MSYS2): use PowerShell to run test exes reliably.
+# - MSYS2/MINGW (MSYSTEM set): use POSIX shell recipes (works in GitHub Actions msys2 shell).
+ifneq ($(MSYSTEM),)
+
+ci: clean
+	@echo "=== Building test binaries ==="
+	@echo "SDL2_CFLAGS: $(SDL2_CFLAGS)"
+	@echo "SDL2_LIBS: $(SDL2_LIBS)"
+	@echo "SDL_TEST_BIN: $(SDL_TEST_BIN)"
+	@$(MAKE) $(TEST_BINS)
+	@echo "=== Running tests ==="
+	@set -e; \
+	exit_code=0; \
+	for t in $(TEST_BINS); do \
+		if [ -f ./$$t ]; then \
+			echo "Running $$t..."; \
+			./$$t > $$t.log 2>&1 || exit_code=1; \
+			cat $$t.log; \
+		elif [ -f ./$$t.exe ]; then \
+			echo "Running $$t..."; \
+			./$$t.exe > $$t.log 2>&1 || exit_code=1; \
+			cat $$t.log; \
+		else \
+			echo "SKIP: $$t not built"; \
+		fi; \
+	done; \
+	exit $$exit_code
+
+clean:
+	rm -f $(TEST_BINS) *.o *.log test-output.log
+
+else
+
 # Force cmd.exe for recipe execution on Windows.
 # This avoids MSYS2 /bin/sh expanding PowerShell variables like $t/$bins.
 SHELL := cmd.exe
@@ -117,6 +151,8 @@ ci: clean all
 
 clean:
 	@powershell -NoProfile -Command "$${ErrorActionPreference}='SilentlyContinue'; $$bins=('$(TEST_BINS)' -split '\\s+'); foreach($$t in $$bins){ if(-not $$t){ continue }; Remove-Item -Force -ErrorAction SilentlyContinue $$t, ($$t + '.exe') }; Remove-Item -Force -ErrorAction SilentlyContinue *.o, *.log, 'test-output.log'; exit 0"
+
+endif
 else
 ci: clean
 	@echo "=== Building test binaries ==="
