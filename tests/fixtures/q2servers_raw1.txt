@@ -1,0 +1,5 @@
+# q2servers.com raw=1 style text list (fixture)
+# Lines are either "ip:port" or "quake2://ip:port".
+# Comments/blank lines are ignored by the parser fixture helper.
+quake2://1.2.3.4:27910
+5.6.7.8:27911

@@ -5,7 +5,18 @@
 
 # Prefer gcc over make's built-in default 'cc', but allow overrides via env/CLI.
 ifeq ($(origin CC),default)
-CC = gcc
+ifeq ($(OS),Windows_NT)
+	# Match the main build's MSYS2 env vars if available.
+	MSYS2_ROOT ?= $(or $(EGL_MSYS2_ROOT),C:/msys64)
+	MSYS2_PREFIX ?= $(or $(EGL_MSYS2_PREFIX),mingw64)
+	ifneq ($(wildcard $(MSYS2_ROOT)/$(MSYS2_PREFIX)/bin/gcc.exe),)
+		CC = $(MSYS2_ROOT)/$(MSYS2_PREFIX)/bin/gcc.exe
+	else
+		CC = gcc
+	endif
+else
+	CC = gcc
+endif
 endif
 
 CFLAGS += -Wall -Wextra -g -I.. -I../shared -I../common -I../unity -DTEST_BUILD
@@ -40,10 +51,12 @@ SDL2_LIBS := $(shell pkg-config --libs sdl2 2>/dev/null)
 
 # Fallback for MSYS2/MinGW when pkg-config fails
 ifeq ($(SDL2_CFLAGS),)
-  ifdef MSYSTEM_PREFIX
-    SDL2_CFLAGS := -I$(MSYSTEM_PREFIX)/include/SDL2
-    SDL2_LIBS := -L$(MSYSTEM_PREFIX)/lib -lSDL2
-  endif
+	# Prefer matching the main Makefile's environment variables.
+	MSYS2_ROOT ?= $(or $(EGL_MSYS2_ROOT),C:/msys64)
+	MSYS2_PREFIX ?= $(or $(EGL_MSYS2_PREFIX),mingw64)
+
+	SDL2_CFLAGS := -I$(MSYS2_ROOT)/$(MSYS2_PREFIX)/include/SDL2
+	SDL2_LIBS := -L$(MSYS2_ROOT)/$(MSYS2_PREFIX)/lib -lSDL2
 endif
 
 # Only include SDL test if SDL2 is available
@@ -56,6 +69,7 @@ TEST_BINS = \
 	test_mathlib \
 	test_byteswap \
 	test_serverbrowser_ui \
+	test_serverbrowser_parse \
 	test_favorites_persistence \
 	test_config_write \
 	test_net_msg \
@@ -138,6 +152,9 @@ test_byteswap: test_byteswap.c ../shared/byteswap.c
 
 test_serverbrowser_ui: test_serverbrowser_ui.c ../cgame/menu/sb_layout.c
 	$(CC) $(CFLAGS) -I../cgame/menu -o $@ $< ../cgame/menu/sb_layout.c
+
+test_serverbrowser_parse: test_serverbrowser_parse.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 test_favorites_persistence: test_favorites_persistence.c
 	$(CC) $(CFLAGS) -o $@ $<

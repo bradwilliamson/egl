@@ -1,0 +1,42 @@
+# Validate Docker-based Linux build (same flow as docker-package-linux).
+# Use case: local Windows users build Linux binaries via Docker; this ensures that path doesn't rot.
+# Trigger: manual or weekly. Does not block CI/release.
+
+name: Docker Linux Build
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Weekly, Monday 00:00 UTC
+    - cron: '0 0 * * 1'
+
+jobs:
+  docker-package-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Linux package via Docker
+        run: |
+          IMAGE="${EGL_DOCKER_IMAGE:-ubuntu:22.04}"
+          docker run --rm -t \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            "$IMAGE" \
+            sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential pkg-config ca-certificates libcurl4-openssl-dev libsdl2-dev libxrandr-dev libx11-dev libxi-dev libgl1-mesa-dev libjpeg-dev libpng-dev libminizip-dev zip && sh tools/package.sh"
+
+      - name: Verify output
+        run: |
+          test -f out/egl-linux/egl
+          test -f out/egl-linux/eglded
+          test -f out/egl-linux/baseq2/eglcgame.so
+          test -f out/egl-linux/baseq2/game.so
+          test -f out/egl-linux/baseq2/egl.pkz
+          echo "All expected artifacts present."
+
+      - name: Upload Linux package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: egl-linux-docker
+          path: out/egl-linux/

@@ -776,7 +776,6 @@ void Touch_Item (edict_t *ent, edict_t *other, cBspPlane_t *plane, cBspSurface_t
 		// flash the screen
 		other->client->bonus_alpha = 0.25;	
 
-		gi.AddCommandString("joy_rumble 10000 10000 150\n");
 
 		// show icon and name on status bar
 		other->client->ps.stats[STAT_PICKUP_ICON] = gi.imageindex(ent->item->icon);

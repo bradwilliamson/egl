@@ -197,8 +197,8 @@ typedef struct sdl2_gamepad_bind_s {
 
 static void SDL2_ApplyDefaultGamepadBinds (qBool force, qBool zoomPreset)
 {
-    // "Classic" preset: LT=use. Only applied to JOY/AUX keys.
-    static const sdl2_gamepad_bind_t binds_classic[] = {
+    // A fairly modern, shooter-friendly baseline. Only applied to JOY/AUX keys.
+    static const sdl2_gamepad_bind_t binds_default[] = {
         // Triggers
         { K_AUX28, "+attack" },
         { K_AUX27, "+use" },
@@ -225,7 +225,8 @@ static void SDL2_ApplyDefaultGamepadBinds (qBool force, qBool zoomPreset)
         { K_AUX5, "+speed" },
     };
 
-    // Default preset (Fortnite-ish): LT=zoom/ADS, RT=fire, X=use.
+    // Alternate, Fortnite-adjacent preset: LT acts as hold-to-zoom.
+    // Keep +use reachable on a face button (X/Square).
     static const sdl2_gamepad_bind_t binds_zoom[] = {
         // Triggers
         { K_AUX28, "+attack" },
@@ -253,9 +254,9 @@ static void SDL2_ApplyDefaultGamepadBinds (qBool force, qBool zoomPreset)
         { K_AUX5, "+speed" },
     };
 
-    const sdl2_gamepad_bind_t *binds = zoomPreset ? binds_zoom : binds_classic;
+    const sdl2_gamepad_bind_t *binds = zoomPreset ? binds_zoom : binds_default;
     int bindCount = zoomPreset ? (int)(sizeof (binds_zoom) / sizeof (binds_zoom[0]))
-                               : (int)(sizeof (binds_classic) / sizeof (binds_classic[0]));
+                               : (int)(sizeof (binds_default) / sizeof (binds_default[0]));
 
     int i;
     qBool any = qFalse;
@@ -270,18 +271,16 @@ static void SDL2_ApplyDefaultGamepadBinds (qBool force, qBool zoomPreset)
 
     if (any) {
         if (zoomPreset)
-            Com_Printf (0, "Gamepad: default binds applied (LT=zoom; use joy_bind_defaults [-force] [-classic])\n");
+            Com_Printf (0, "Gamepad: default binds applied (LT=zoom; use joy_bind_defaults [-force] [-zoom])\n");
         else
-            Com_Printf (0, "Gamepad: default binds applied (LT=use; use joy_bind_defaults [-force] [-classic])\n");
+            Com_Printf (0, "Gamepad: default binds applied (use joy_bind_defaults [-force] [-zoom])\n");
     }
 }
 
 static void IN_JoyBindDefaults_f (void)
 {
     qBool force = qFalse;
-    // Default to a modern shooter layout (Fortnite-ish): LT=zoom/ADS, RT=fire, X=use.
-    // A "classic" preset is available with LT=use.
-    qBool zoomPreset = qTrue;
+    qBool zoomPreset = qFalse;
     int i;
 
     for (i = 1; i < Cmd_Argc (); i++) {
@@ -292,9 +291,6 @@ static void IN_JoyBindDefaults_f (void)
             force = qTrue;
         else if (!Q_stricmp (a, "zoom") || !Q_stricmp (a, "-zoom"))
             zoomPreset = qTrue;
-        else if (!Q_stricmp (a, "classic") || !Q_stricmp (a, "-classic")
-            || !Q_stricmp (a, "use") || !Q_stricmp (a, "-use"))
-            zoomPreset = qFalse;
     }
 
     SDL2_ApplyDefaultGamepadBinds (force, zoomPreset);
@@ -375,7 +371,7 @@ static qBool SDL2_OpenFirstController (void)
         if (!sdl_joy_bind_attempted) {
             sdl_joy_bind_attempted = qTrue;
             if (joy_autobind && joy_autobind->intVal)
-                SDL2_ApplyDefaultGamepadBinds (qFalse, qTrue);
+                SDL2_ApplyDefaultGamepadBinds (qFalse, qFalse);
         }
         return qTrue;
     }
@@ -411,23 +407,11 @@ static void SDL2_UpdateControllerEnabled (void)
     if (!in_joystick)
         return;
 
-    qBool wantUpdate = qFalse;
-
     if (in_joystick->modified) {
         in_joystick->modified = qFalse;
-        wantUpdate = qTrue;
-    }
-
-    if (in_joystick_auto && in_joystick_auto->modified) {
-        in_joystick_auto->modified = qFalse;
-        wantUpdate = qTrue;
-    }
-
-    if (wantUpdate) {
 
         if (in_joystick->intVal) {
-            if (!SDL2_OpenFirstController ())
-                Com_Printf (PRNT_WARNING, "Gamepad: no compatible SDL2 GameController detected. If your controller was connected after launch, try unplug/replug; otherwise you may need an SDL mapping.\n");
+            SDL2_OpenFirstController ();
         }
         else {
             SDL2_CloseController ();
@@ -591,10 +575,6 @@ void IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float vol
 
     if (intens <= 0.0f)
         return;
-
-    // Quake II benefits from subtle haptics; keep default effects short.
-    if (duration > 400)
-        duration = 400;
 
     // Apply modifiers
     float mag = joy_haptic_magnitude->floatVal;
@@ -909,7 +889,7 @@ void IN_Init (void)
     joy_invert_y = Cvar_Register ("joy_invert_y", "0", CVAR_ARCHIVE);
     joy_trigger_threshold = Cvar_Register ("joy_trigger_threshold", "0.55", CVAR_ARCHIVE);
     joy_rumble_enable = Cvar_Register ("joy_rumble_enable", "1", CVAR_ARCHIVE);
-    joy_haptic_magnitude = Cvar_Register ("joy_haptic_magnitude", "0.35", CVAR_ARCHIVE);
+    joy_haptic_magnitude = Cvar_Register ("joy_haptic_magnitude", "1.0", CVAR_ARCHIVE);
     joy_haptic_distance = Cvar_Register ("joy_haptic_distance", "1000.0", CVAR_ARCHIVE);
 
     if (!cmd_in_restart)
@@ -919,7 +899,7 @@ void IN_Init (void)
        cmd_joy_rumble = Cmd_AddCommand ("joy_rumble", IN_Rumble_f, "Test gamepad rumble: joy_rumble <low 0-65535> <high 0-65535> <ms>");
 
     if (!cmd_joy_bind_defaults)
-        cmd_joy_bind_defaults = Cmd_AddCommand ("joy_bind_defaults", IN_JoyBindDefaults_f, "Apply default gamepad binds (won't override existing binds unless -force; use -classic for LT=use)");
+        cmd_joy_bind_defaults = Cmd_AddCommand ("joy_bind_defaults", IN_JoyBindDefaults_f, "Apply default gamepad binds (won't override existing binds unless -force; use -zoom for LT=zoom)");
 
     if (!cmd_joy_unbindall)
         cmd_joy_unbindall = Cmd_AddCommand ("joy_unbindall", IN_JoyUnbindAll_f, "Clear all JOY/AUX bindings (keyboard/mouse untouched)");

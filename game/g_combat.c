@@ -505,7 +505,6 @@ void T_Damage (edict_t *targ, edict_t *inflictor, edict_t *attacker, vec3_t dir,
 
 	if (client && take > 0 && level.time > client->rumble_time)
 	{
-		gi.AddCommandString("joy_rumble 20000 20000 300\n");
 		client->rumble_time = level.time + 0.5;
 	}
 
