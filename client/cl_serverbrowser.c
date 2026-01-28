@@ -437,7 +437,7 @@ static void SB_RefreshMasterDefaults(void)
 		if (a1 && a1[0])
 			Cvar_Set("sb_master2", (char *)a1, qTrue);
 		else
-			Cvar_Set("sb_master2", "master.q2servers.com", qTrue);
+			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 }
 
@@ -557,7 +557,7 @@ void SrvBrowser_Init(void)
 	sb_master[3] = Cvar_Register("sb_master4", "", 0);
 
 	// If the user still has the old hardcoded id master (often dead in 2026),
-	// or the sb_master slots are empty, prefer adr0/adr1 if provided.
+	// or the sb_master slots are empty, provide working HTTP master defaults.
 	{
 		const char *a0 = Cvar_GetStringValue("adr0");
 		const char *a1 = Cvar_GetStringValue("adr1");
@@ -566,8 +566,13 @@ void SrvBrowser_Init(void)
 
 		if (a0 && a0[0] && (!m1[0] || !strcmp(m1, "192.246.40.37:27900")))
 			Cvar_Set("sb_master1", (char *)a0, qTrue);
+		else if (!m1[0] || !strcmp(m1, "192.246.40.37:27900"))
+			Cvar_Set("sb_master1", "http://q2servers.com/?raw=2", qTrue);
+
 		if (a1 && a1[0] && (!m2[0] || !strcmp(m2, "192.246.40.37:27900")))
 			Cvar_Set("sb_master2", (char *)a1, qTrue);
+		else if (!m2[0] || !strcmp(m2, "192.246.40.37:27900"))
+			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 
 	Cmd_AddCommand("sb_refresh", SrvBrowser_Refresh_f, "Refresh server list");
