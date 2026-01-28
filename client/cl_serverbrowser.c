@@ -437,7 +437,7 @@ static void SB_RefreshMasterDefaults(void)
 		if (a1 && a1[0])
 			Cvar_Set("sb_master2", (char *)a1, qTrue);
 		else
-			Cvar_Set("sb_master2", "master.q2servers.com", qTrue);
+			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 }
 
@@ -458,11 +458,30 @@ void SrvBrowser_MasterServersResponse(const netAdr_t *from, const byte *payload,
 
 	beforeCount = g_numServers;
 
-	// Detect format: traditional Quake2 uses backslash delimiters before each 6-byte entry.
-	// Modern HTTP masters (q2servers.com ?raw=2) send continuous 6-byte blocks with no delimiters.
-	// Check if first byte is backslash to determine format.
-	if (payload[0] == '\\')
-		hasBackslashDelim = qTrue;
+	// Detect format:
+	// - Traditional Quake2 master replies use a single '\\' delimiter before each 6-byte entry.
+	// - Some HTTP masters provide raw continuous 6-byte entries with no delimiters.
+	// Do NOT rely on payload[0] alone: a raw list may legitimately start with 0x5C (92.*.*.*).
+	if (payload[0] == '\\') {
+		int hits = 0;
+		int checks = 0;
+		size_t off;
+		for (off = 0; off < payloadLen && checks < 4; off += 7, checks++) {
+			// Expected pattern: '\\' + 6 bytes per entry => delimiters at offsets 0,7,14,...
+			if (off < payloadLen && payload[off] == '\\')
+				hits++;
+			else
+				break;
+			if (off + 7 > payloadLen)
+				break;
+		}
+		// Require at least two consecutive delimiters to avoid false positives.
+		if (hits >= 2)
+			hasBackslashDelim = qTrue;
+	}
+
+	if (sb_debug && sb_debug->intVal >= 2)
+		Com_Printf(0, "Master reply parse mode: %s\n", hasBackslashDelim ? "delimited" : "raw6");
 
 	while (i < payloadLen) {
 		netAdr_t adr;
@@ -538,7 +557,7 @@ void SrvBrowser_Init(void)
 	sb_master[3] = Cvar_Register("sb_master4", "", 0);
 
 	// If the user still has the old hardcoded id master (often dead in 2026),
-	// or the sb_master slots are empty, prefer adr0/adr1 if provided.
+	// or the sb_master slots are empty, provide working HTTP master defaults.
 	{
 		const char *a0 = Cvar_GetStringValue("adr0");
 		const char *a1 = Cvar_GetStringValue("adr1");
@@ -547,8 +566,13 @@ void SrvBrowser_Init(void)
 
 		if (a0 && a0[0] && (!m1[0] || !strcmp(m1, "192.246.40.37:27900")))
 			Cvar_Set("sb_master1", (char *)a0, qTrue);
+		else if (!m1[0] || !strcmp(m1, "192.246.40.37:27900"))
+			Cvar_Set("sb_master1", "http://q2servers.com/?raw=2", qTrue);
+
 		if (a1 && a1[0] && (!m2[0] || !strcmp(m2, "192.246.40.37:27900")))
 			Cvar_Set("sb_master2", (char *)a1, qTrue);
+		else if (!m2[0] || !strcmp(m2, "192.246.40.37:27900"))
+			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 
 	Cmd_AddCommand("sb_refresh", SrvBrowser_Refresh_f, "Refresh server list");
