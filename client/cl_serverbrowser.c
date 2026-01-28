@@ -458,11 +458,30 @@ void SrvBrowser_MasterServersResponse(const netAdr_t *from, const byte *payload,
 
 	beforeCount = g_numServers;
 
-	// Detect format: traditional Quake2 uses backslash delimiters before each 6-byte entry.
-	// Modern HTTP masters (q2servers.com ?raw=2) send continuous 6-byte blocks with no delimiters.
-	// Check if first byte is backslash to determine format.
-	if (payload[0] == '\\')
-		hasBackslashDelim = qTrue;
+	// Detect format:
+	// - Traditional Quake2 master replies use a single '\\' delimiter before each 6-byte entry.
+	// - Some HTTP masters provide raw continuous 6-byte entries with no delimiters.
+	// Do NOT rely on payload[0] alone: a raw list may legitimately start with 0x5C (92.*.*.*).
+	if (payload[0] == '\\') {
+		int hits = 0;
+		int checks = 0;
+		size_t off;
+		for (off = 0; off < payloadLen && checks < 4; off += 7, checks++) {
+			// Expected pattern: '\\' + 6 bytes per entry => delimiters at offsets 0,7,14,...
+			if (off < payloadLen && payload[off] == '\\')
+				hits++;
+			else
+				break;
+			if (off + 7 > payloadLen)
+				break;
+		}
+		// Require at least two consecutive delimiters to avoid false positives.
+		if (hits >= 2)
+			hasBackslashDelim = qTrue;
+	}
+
+	if (sb_debug && sb_debug->intVal >= 2)
+		Com_Printf(0, "Master reply parse mode: %s\n", hasBackslashDelim ? "delimited" : "raw6");
 
 	while (i < payloadLen) {
 		netAdr_t adr;
