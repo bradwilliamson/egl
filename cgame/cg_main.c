@@ -62,6 +62,7 @@ extern cVar_t	*cl_gun;
 extern cVar_t	*cl_noskins;
 extern cVar_t	*cl_predict;
 extern cVar_t	*cl_showmiss;
+extern cVar_t	*cl_strafejump_hack;
 extern cVar_t	*cl_vwep;
 
 extern cVar_t	*gender_auto;
@@ -378,6 +379,7 @@ static void CG_RegisterMain (void)
 	cl_noskins				= cgi.Cvar_Register ("cl_noskins",				"0",			CVAR_CHEAT);
 	cl_predict				= cgi.Cvar_Register ("cl_predict",				"1",			0);
 	cl_showmiss				= cgi.Cvar_Register ("cl_showmiss",				"0",			0);
+	cl_strafejump_hack		= cgi.Cvar_Register ("cl_strafejump_hack",	"0",			CVAR_ARCHIVE);
 	cl_vwep					= cgi.Cvar_Register ("cl_vwep",					"1",			CVAR_ARCHIVE);
 
 	gender_auto				= cgi.Cvar_Register ("gender_auto",				"1",			CVAR_ARCHIVE);
