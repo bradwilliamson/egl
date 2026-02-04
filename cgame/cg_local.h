@@ -394,6 +394,7 @@ extern cVar_t	*cl_gun;
 extern cVar_t	*cl_noskins;
 extern cVar_t	*cl_predict;
 extern cVar_t	*cl_showmiss;
+extern cVar_t	*cl_strafejump_hack;
 extern cVar_t	*cl_vwep;
 
 extern cVar_t	*crosshair;

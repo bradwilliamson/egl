@@ -46,6 +46,8 @@ cVar_t	*allow_download_maps;
 
 cVar_t	*sv_airaccelerate;
 
+cVar_t	*sv_strafejump_hack;
+
 cVar_t	*sv_noreload;			// don't reload level state when reentering
 
 cVar_t	*maxclients;
@@ -999,6 +1001,7 @@ void SV_ServerInit (void)
 	sv_reconnect_limit		= Cvar_Register ("sv_reconnect_limit",		"3",		CVAR_ARCHIVE);
 	sv_noreload				= Cvar_Register ("sv_noreload",				"0",		0);
 	sv_airaccelerate		= Cvar_Register ("sv_airaccelerate",		"0",		CVAR_LATCH_SERVER);
+	sv_strafejump_hack		= Cvar_Register ("sv_strafejump_hack",		"0",		CVAR_ARCHIVE);
 
 	allow_download			= Cvar_Register ("allow_download",			"1",		CVAR_ARCHIVE);
 	allow_download_players	= Cvar_Register ("allow_download_players",	"0",		CVAR_ARCHIVE);

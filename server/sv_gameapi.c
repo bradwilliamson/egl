@@ -378,6 +378,7 @@ GI_Pmove
 static void GI_Pmove (pMove_t *pMove)
 {
 	pMoveNew_t	epm;
+	extern cVar_t *sv_strafejump_hack;
 
 	memcpy (&epm, pMove, sizeof (pMove_t));
 	epm.cmd = pMove->cmd;
@@ -385,7 +386,7 @@ static void GI_Pmove (pMove_t *pMove)
 	epm.pointContents = pMove->pointContents;
 	epm.trace = pMove->trace;
 	epm.multiplier = 1;
-	epm.strafeHack = 0;
+	epm.strafeHack = sv_strafejump_hack ? sv_strafejump_hack->intVal : 0;
 
 #ifndef DEDICATED_ONLY
 	if (!dedicated->intVal && !CL_CGModule_Pmove (&epm, sv_airAcceleration))

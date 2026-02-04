@@ -45,6 +45,7 @@ cVar_t	*cl_gun;
 cVar_t	*cl_noskins;
 cVar_t	*cl_predict;
 cVar_t	*cl_showmiss;
+cVar_t	*cl_strafejump_hack;
 cVar_t	*cl_vwep;
 
 cVar_t	*crosshair;

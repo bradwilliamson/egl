@@ -293,7 +293,7 @@ void CG_PredictMovement (void)
 	else
 		pm.multiplier = 1;
 
-	pm.strafeHack = cg.strafeHack;
+	pm.strafeHack = cg.strafeHack || cl_strafejump_hack->intVal;
 
 	// Run frames
 	frame = 0;
