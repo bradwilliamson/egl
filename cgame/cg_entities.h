@@ -46,7 +46,7 @@ typedef struct cgEntity_s {
 	qBool			muzzVWeap;
 } cgEntity_t;
 
-extern cgEntity_t		cg_entityList[MAX_CS_EDICTS];
+extern cgEntity_t		cg_entityList[MAX_CS_EDICTS_Q2PRO];
 
 // the cg_parseEntities must be large enough to hold UPDATE_BACKUP frames of
 // entities, so that when a delta compressed message arives from the server

@@ -27,6 +27,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 static int CL_ParseEntityBits (uint32 *bits);
 static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, int bits);
 
+/*
+===================
+CL_GetMaxEdicts
+
+Returns the maximum entity number based on current protocol.
+Q2Pro with minor version >= 1024 supports 8192 entities.
+===================
+*/
+static int CL_GetMaxEdicts (void)
+{
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && 
+	    cls.protocolMinorVersion >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS)
+		return MAX_CS_EDICTS_Q2PRO;
+	return MAX_CS_EDICTS;
+}
+
 char *cl_svcStrings[256] = {
 	"SVC_BAD",
 
@@ -105,7 +121,7 @@ static void CL_ParseGamestate (int cmd)
 			index = CL_ParseEntityBits (&bits);
 			if (!index)
 				break;
-			if (index < 0 || index >= MAX_CS_EDICTS)
+			if (index < 0 || index >= CL_GetMaxEdicts())
 				Com_Error (ERR_DROP, "CL_ParseGamestate: bad baseline index %d", index);
 			CL_ParseDelta (&nullState, &cl_baseLines[index], index, bits);
 		}
@@ -478,7 +494,7 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 
 	for ( ; ; ) {
 		newNum = CL_ParseEntityBits (&bits);
-		if (newNum >= MAX_CS_EDICTS)
+		if (newNum >= CL_GetMaxEdicts())
 			Com_Error (ERR_DROP, "CL_ParsePacketEntities: bad number:%i", newNum);
 
 		if (cls.netMessage.readCount > cls.netMessage.curSize)
@@ -990,7 +1006,7 @@ static void CL_ParseStartSoundPacket (void)
 		// Entity reletive
 		entChannel = MSG_ReadShort (&cls.netMessage); 
 		entNum = entChannel >> 3;
-		if (entNum > MAX_CS_EDICTS)
+		if (entNum > CL_GetMaxEdicts())
 			Com_Error (ERR_DROP, "CL_ParseStartSoundPacket: entNum = %i", entNum);
 
 		entChannel &= 7;

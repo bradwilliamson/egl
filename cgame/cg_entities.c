@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "cg_local.h"
 
-cgEntity_t		cg_entityList[MAX_CS_EDICTS];
+cgEntity_t		cg_entityList[MAX_CS_EDICTS_Q2PRO];
 entityState_t	cg_parseEntities[MAX_PARSE_ENTITIES];
 
 static qBool	cg_inFrameSequence = qFalse;
@@ -1190,7 +1190,7 @@ void CG_GetEntitySoundOrigin (int entNum, vec3_t origin, vec3_t velocity)
 {
 	cgEntity_t	*ent;
 
-	if (entNum < 0 || entNum >= MAX_CS_EDICTS)
+	if (entNum < 0 || entNum >= MAX_CS_EDICTS_Q2PRO)
 		Com_Error (ERR_DROP, "CG_GetEntitySoundOrigin: bad entNum");
 
 	ent = &cg_entityList[entNum];

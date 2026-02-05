@@ -413,7 +413,7 @@ qBool CL_StartDemoRecording (char *name)
 
 	// Baselines
 	memset (&nullstate, 0, sizeof (nullstate));
-	for (i=0; i<MAX_CS_EDICTS ; i++) {
+	for (i=0; i<MAX_CS_EDICTS_Q2PRO ; i++) {
 		memcpy (&temp, &cl_baseLines[i], sizeof (entityStateOld_t));
 		ent = &temp;
 		if (!ent->modelIndex)

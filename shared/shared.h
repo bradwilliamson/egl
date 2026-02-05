@@ -1717,7 +1717,8 @@ enum {
 
 // per-level limits
 #define MAX_CS_CLIENTS		256		// absolute limit
-#define MAX_CS_EDICTS		1024	// must change protocol to increase more
+#define MAX_CS_EDICTS		1024	// vanilla/R1Q2 limit
+#define MAX_CS_EDICTS_Q2PRO	8192	// Q2Pro extended limit (protocol 36, minor >= 1024)
 #define MAX_CS_LIGHTSTYLES	256
 #define MAX_CS_MODELS		256		// these are sent over the net as bytes
 #define MAX_CS_SOUNDS		256		// so they cannot be blindly increased

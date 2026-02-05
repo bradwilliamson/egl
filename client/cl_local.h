@@ -446,7 +446,7 @@ void		IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float vo
 //
 
 // delta from this if not from a previous frame
-extern entityState_t	cl_baseLines[MAX_CS_EDICTS];
+extern entityState_t	cl_baseLines[MAX_CS_EDICTS_Q2PRO];
 
 // the cl_parseEntities must be large enough to hold UPDATE_BACKUP frames of
 // entities, so that when a delta compressed message arives from the server

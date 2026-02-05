@@ -77,7 +77,7 @@ clientState_t	cl;
 clientStatic_t	cls;
 clMedia_t		clMedia;
 
-entityState_t	cl_baseLines[MAX_CS_EDICTS];
+entityState_t	cl_baseLines[MAX_CS_EDICTS_Q2PRO];
 entityState_t	cl_parseEntities[MAX_PARSE_ENTITIES];
 
 static netAdr_t	cl_lastRConTo;
