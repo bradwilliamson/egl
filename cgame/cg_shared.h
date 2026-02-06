@@ -182,9 +182,7 @@ typedef enum keyDest_s {
 =============================================================================
 */
 
-// Ring buffer for entity states across UPDATE_BACKUP frames for delta compression
-// Must be large enough to hold all entities across 16 backup frames (UPDATE_BACKUP=16)
-#define MAX_PARSE_ENTITIES			131072		// 16 * 8192 = 131072 (UPDATE_BACKUP * MAX_CS_EDICTS_Q2PRO)
+#define MAX_PARSE_ENTITIES			1024
 #define MAX_PARSEENTITIES_MASK		(MAX_PARSE_ENTITIES-1)
 #define MAX_CLIENTWEAPONMODELS		20		// PGM -- upped from 16 to fit the chainfist vwep
 

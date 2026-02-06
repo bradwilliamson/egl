@@ -109,6 +109,7 @@ typedef struct clientState_s {
 	int					serverCount;				// server identification for prespawns
 	int					enhancedServer;				// ENHANCED_SERVER_PROTOCOL
 	qBool				strafeHack;
+	qBool				q2proExtensions;			// Q2Pro PF_EXTENSIONS: extended entity/player/sound encoding
 	char				gameDir[MAX_QPATH];
 	int					playerNum;
 
@@ -446,7 +447,7 @@ void		IN_JoyRumbleTrigger (const char *name, vec3_t origin, int entNum, float vo
 //
 
 // delta from this if not from a previous frame
-extern entityState_t	cl_baseLines[MAX_CS_EDICTS_Q2PRO];
+extern entityState_t	cl_baseLines[MAX_CS_EDICTS];
 
 // the cl_parseEntities must be large enough to hold UPDATE_BACKUP frames of
 // entities, so that when a delta compressed message arives from the server

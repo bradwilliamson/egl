@@ -480,7 +480,7 @@ started, stopped, and merged together as the entities are sent to the client
 static void DMASnd_AddLoopSounds (void)
 {
 	int				i, j;
-	int				sounds[MAX_CS_EDICTS_Q2PRO];
+	int				sounds[MAX_CS_EDICTS];
 	int				left, right;
 	int				leftTotal, rightTotal;
 	channel_t		*ch;

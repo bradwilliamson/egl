@@ -84,7 +84,8 @@ enum {
 	EPS_PMOVE_VELOCITY2	= 1 << 2,
 	EPS_PMOVE_ORIGIN2	= 1 << 3,
 	EPS_VIEWANGLE2		= 1 << 4,
-	EPS_STATS			= 1 << 5
+	EPS_STATS			= 1 << 5,
+	EPS_CLIENTNUM		= 1 << 6	// Q2Pro: delta-encoded clientNum in frame (spectating/MVD)
 };
 
 
@@ -109,7 +110,8 @@ enum {
 	SND_ATTENUATION		= 1 << 1,	// a byte
 	SND_POS				= 1 << 2,	// three coordinates
 	SND_ENT				= 1 << 3,	// a short 0-2: channel, 3-12: entity
-	SND_OFFSET			= 1 << 4	// a byte, msec offset from frame start
+	SND_OFFSET			= 1 << 4,	// a byte, msec offset from frame start
+	SND_INDEX16			= 1 << 5	// Q2Pro ext: sound index is 16-bit
 };
 
 #define DEFAULT_SOUND_PACKET_VOLUME			1.0
@@ -152,8 +154,19 @@ enum {
 	U_SOUND				= 1 << 26,
 	U_SOLID				= 1 << 27,
 
-	U_VELOCITY			= 1 << 28		// new for ENHANCED_PROTOCOL_VERSION
+	U_VELOCITY			= 1 << 28,		// new for ENHANCED_PROTOCOL_VERSION
+
+	// Q2Pro PF_EXTENSIONS: new 4th-byte bits (bits 28-31)
+	U_MODEL16			= 1 << 28,		// Q2Pro ext: model indices are 16-bit (conflicts with U_VELOCITY)
+	U_MOREFX8			= 1 << 29,		// Q2Pro ext: morefx low byte
+	U_ALPHA				= 1 << 30,		// Q2Pro ext: alpha byte
+	U_MOREBITS4			= 1u << 31		// Q2Pro ext: read a 5th header byte
 };
+
+// Q2Pro PF_EXTENSIONS: 5th header byte bits (stored in upper 32 bits, but we
+// only need them for skipping the data — use separate defines)
+#define U5_SCALE		(1 << 0)		// Q2Pro ext: scale byte
+#define U5_MOREFX16		(1 << 1)		// Q2Pro ext: morefx high byte
 
 /*
 =============================================================================

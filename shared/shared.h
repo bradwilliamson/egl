@@ -304,18 +304,18 @@ enum svcTypes {
 	SVC_DELTAPACKETENTITIES,	// [...]
 	SVC_FRAME,
 
-	SVC_ZPACKET,				// new for ENHANCED_PROTOCOL_VERSION
-	SVC_ZDOWNLOAD,				// new for ENHANCED_PROTOCOL_VERSION
-	SVC_PLAYERUPDATE,			// new for ENHANCED_PROTOCOL_VERSION (R1Q2 only, cmd 23)
-	SVC_SETTING,				// new for ENHANCED_PROTOCOL_VERSION (R1Q2 cmd 24, Q2Pro cmd 25)
-
-	// Q2Pro protocol 36 extensions (note: SVC_GAMESTATE conflicts with R1Q2's SVC_PLAYERUPDATE at cmd 23)
-	SVC_GAMESTATE,				// new for Q2PRO_PROTOCOL_VERSION
-	SVC_CONFIGSTRINGSTREAM,	// new for Q2PRO_PROTOCOL_VERSION
-	SVC_BASELINESTREAM,		// new for Q2PRO_PROTOCOL_VERSION
+	SVC_ZPACKET,				// 21: new for ENHANCED_PROTOCOL_VERSION (R1Q2/Q2Pro)
+	SVC_ZDOWNLOAD,				// 22: new for ENHANCED_PROTOCOL_VERSION (R1Q2/Q2Pro)
+	SVC_GAMESTATE,				// 23: Q2Pro gamestate stream (same wire value as R1Q2 svc_playerupdate)
+	SVC_SETTING,				// 24: new for ENHANCED_PROTOCOL_VERSION (R1Q2/Q2Pro)
+	SVC_CONFIGSTRINGSTREAM,		// 25: Q2Pro configstring-only stream
+	SVC_BASELINESTREAM,			// 26: Q2Pro baseline-only stream
 
 	SVC_MAX
 };
+
+// R1Q2 alias: svc_playerupdate shares the same wire value (23) as Q2Pro's svc_gamestate
+#define SVC_PLAYERUPDATE	SVC_GAMESTATE
 
 //
 // game print flags
@@ -1717,8 +1717,7 @@ enum {
 
 // per-level limits
 #define MAX_CS_CLIENTS		256		// absolute limit
-#define MAX_CS_EDICTS		1024	// vanilla/R1Q2 limit
-#define MAX_CS_EDICTS_Q2PRO	8192	// Q2Pro extended limit (protocol 36, minor >= 1024)
+#define MAX_CS_EDICTS		1024	// must change protocol to increase more
 #define MAX_CS_LIGHTSTYLES	256
 #define MAX_CS_MODELS		256		// these are sent over the net as bytes
 #define MAX_CS_SOUNDS		256		// so they cannot be blindly increased
