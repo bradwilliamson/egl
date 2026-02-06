@@ -1113,7 +1113,7 @@ void Snd_StartSound (vec3_t origin, int entNum, entChannel_t entChannel, struct 
 		return;
 
 	// Sanity check
-	if (entNum < 0 || entNum >= MAX_CS_EDICTS_Q2PRO) {
+	if (entNum < 0 || entNum >= MAX_CS_EDICTS) {
 		Com_Printf (PRNT_ERROR, "Snd_StartSound: invalid entNum (%i), forcing 0", entNum);
 		entNum = 0;
 	}

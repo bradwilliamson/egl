@@ -70,7 +70,7 @@ void CG_ParseMuzzleFlash (void)
 
 	entNum = cgi.MSG_ReadShort ();
 	flashNum = cgi.MSG_ReadByte ();
-	if (entNum < 1 || entNum >= MAX_CS_EDICTS_Q2PRO) {
+	if (entNum < 1 || entNum >= MAX_CS_EDICTS) {
 		Com_DevPrintf (0, "CG_ParseMuzzleFlash: ignoring bad entity %d (flash=%d)\n", entNum, flashNum);
 		return;
 	}
@@ -325,7 +325,7 @@ void CG_ParseMuzzleFlash2 (void)
 
 	entNum = cgi.MSG_ReadShort ();
 	flashNum = cgi.MSG_ReadByte ();
-	if (entNum < 1 || entNum >= MAX_CS_EDICTS_Q2PRO) {
+	if (entNum < 1 || entNum >= MAX_CS_EDICTS) {
 		Com_DevPrintf (0, "CG_ParseMuzzleFlash2: ignoring bad entity %d (flash=%d)\n", entNum, flashNum);
 		return;
 	}

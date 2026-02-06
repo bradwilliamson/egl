@@ -27,22 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 static int CL_ParseEntityBits (uint32 *bits);
 static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, int bits);
 
-/*
-===================
-CL_GetMaxEdicts
-
-Returns the maximum entity number based on current protocol.
-Q2Pro with minor version >= 1024 supports 8192 entities.
-===================
-*/
-static int CL_GetMaxEdicts (void)
-{
-	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION && 
-	    cls.protocolMinorVersion >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS)
-		return MAX_CS_EDICTS_Q2PRO;
-	return MAX_CS_EDICTS;
-}
-
 char *cl_svcStrings[256] = {
 	"SVC_BAD",
 
@@ -121,7 +105,7 @@ static void CL_ParseGamestate (int cmd)
 			index = CL_ParseEntityBits (&bits);
 			if (!index)
 				break;
-			if (index < 0 || index >= CL_GetMaxEdicts())
+			if (index < 0 || index >= MAX_CS_EDICTS)
 				Com_Error (ERR_DROP, "CL_ParseGamestate: bad baseline index %d", index);
 			CL_ParseDelta (&nullState, &cl_baseLines[index], index, bits);
 		}
@@ -149,10 +133,14 @@ CL_ParseEntityBits
 Returns the entity number and the header bits
 =================
 */
+static byte cl_entityExtraBits5;	// Q2Pro PF_EXTENSIONS: 5th header byte (U5_SCALE, U5_MOREFX16)
+
 static int CL_ParseEntityBits (uint32 *bits)
 {
 	uint32		b, total;
 	int			number;
+
+	cl_entityExtraBits5 = 0;
 
 	total = MSG_ReadByte (&cls.netMessage);
 	if (total & U_MOREBITS1) {
@@ -166,6 +154,11 @@ static int CL_ParseEntityBits (uint32 *bits)
 	if (total & U_MOREBITS3) {
 		b = MSG_ReadByte (&cls.netMessage);
 		total |= b<<24;
+	}
+
+	// Q2Pro PF_EXTENSIONS: 5th header byte for extended entity bits
+	if (cl.q2proExtensions && (total & U_MOREBITS4)) {
+		cl_entityExtraBits5 = MSG_ReadByte (&cls.netMessage);
 	}
 
 	if (total & U_NUMBER16)
@@ -197,14 +190,27 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 
 	to->number = number;
 
-	if (bits & U_MODEL)
-		to->modelIndex = MSG_ReadByte (&cls.netMessage);
-	if (bits & U_MODEL2)
-		to->modelIndex2 = MSG_ReadByte (&cls.netMessage);
-	if (bits & U_MODEL3)
-		to->modelIndex3 = MSG_ReadByte (&cls.netMessage);
-	if (bits & U_MODEL4)
-		to->modelIndex4 = MSG_ReadByte (&cls.netMessage);
+	// Q2Pro PF_EXTENSIONS: U_MODEL16 means model indices are 16-bit
+	if (cl.q2proExtensions && (bits & U_MODEL16)) {
+		if (bits & U_MODEL)
+			to->modelIndex = MSG_ReadShort (&cls.netMessage);
+		if (bits & U_MODEL2)
+			to->modelIndex2 = MSG_ReadShort (&cls.netMessage);
+		if (bits & U_MODEL3)
+			to->modelIndex3 = MSG_ReadShort (&cls.netMessage);
+		if (bits & U_MODEL4)
+			to->modelIndex4 = MSG_ReadShort (&cls.netMessage);
+	}
+	else {
+		if (bits & U_MODEL)
+			to->modelIndex = MSG_ReadByte (&cls.netMessage);
+		if (bits & U_MODEL2)
+			to->modelIndex2 = MSG_ReadByte (&cls.netMessage);
+		if (bits & U_MODEL3)
+			to->modelIndex3 = MSG_ReadByte (&cls.netMessage);
+		if (bits & U_MODEL4)
+			to->modelIndex4 = MSG_ReadByte (&cls.netMessage);
+	}
 		
 	if (bits & U_FRAME8)
 		to->frame = MSG_ReadByte (&cls.netMessage);
@@ -249,8 +255,20 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 	if (bits & U_OLDORIGIN)
 		MSG_ReadPos (&cls.netMessage, to->oldOrigin);
 
-	if (bits & U_SOUND)
-		to->sound = MSG_ReadByte (&cls.netMessage);
+	if (bits & U_SOUND) {
+		if (cl.q2proExtensions) {
+			// Q2Pro PF_EXTENSIONS: sound is a short (14-bit index + 2 flag bits)
+			int sndWord = MSG_ReadShort (&cls.netMessage);
+			to->sound = sndWord & 0x3FFF;	// 14-bit sound index
+			if (sndWord & (1 << 14))
+				MSG_ReadByte (&cls.netMessage);	// loop_volume — consume
+			if (sndWord & (1 << 15))
+				MSG_ReadByte (&cls.netMessage);	// loop_attenuation — consume
+		}
+		else {
+			to->sound = MSG_ReadByte (&cls.netMessage);
+		}
+	}
 
 	if (bits & U_EVENT)
 		to->event = MSG_ReadByte (&cls.netMessage);
@@ -270,7 +288,10 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 			to->solid = MSG_ReadShort (&cls.netMessage);
 	}
 
-	if (bits & U_VELOCITY)
+	// Note: U_VELOCITY (bit 28) conflicts with U_MODEL16 (bit 28) in Q2Pro PF_EXTENSIONS.
+	// When PF_EXTENSIONS is active, bit 28 means U_MODEL16 (already handled above),
+	// NOT U_VELOCITY. Only read velocity when extensions are NOT active.
+	if ((bits & U_VELOCITY) && !cl.q2proExtensions)
 	{
 		if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION)
 		{
@@ -278,9 +299,28 @@ static void CL_ParseDelta (entityState_t *from, entityState_t *to, int number, i
 		}
 		else if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION)
 		{
-			// Q2PRO 36: Read velocity
+			// Q2PRO 36 (no extensions): Read velocity
 			MSG_ReadPos (&cls.netMessage, to->velocity);
 		}
+	}
+
+	// Q2Pro PF_EXTENSIONS: consume new entity fields to keep stream aligned
+	if (cl.q2proExtensions) {
+		// morefx: 1, 2, or 4 bytes depending on bits
+		if ((bits & U_MOREFX8) && (cl_entityExtraBits5 & U5_MOREFX16))
+			MSG_ReadLong (&cls.netMessage);		// morefx as 32-bit
+		else if (cl_entityExtraBits5 & U5_MOREFX16)
+			MSG_ReadShort (&cls.netMessage);	// morefx as 16-bit (high byte only — unlikely without U_MOREFX8)
+		else if (bits & U_MOREFX8)
+			MSG_ReadByte (&cls.netMessage);		// morefx as 8-bit
+
+		// alpha
+		if (bits & U_ALPHA)
+			MSG_ReadByte (&cls.netMessage);
+
+		// scale (5th byte bit)
+		if (cl_entityExtraBits5 & U5_SCALE)
+			MSG_ReadByte (&cls.netMessage);
 	}
 }
 
@@ -386,8 +426,12 @@ static void CL_ParsePlayerstate (const frame_t *oldFrame, frame_t *newFrame, int
 		state->kickAngles[2] = MSG_ReadChar (&cls.netMessage) * 0.25f;
 	}
 
-	if (flags & PS_WEAPONINDEX)
-		state->gunIndex = MSG_ReadByte (&cls.netMessage);
+	if (flags & PS_WEAPONINDEX) {
+		if (cl.q2proExtensions)
+			state->gunIndex = MSG_ReadShort (&cls.netMessage);	// Q2Pro ext: 16-bit gun index
+		else
+			state->gunIndex = MSG_ReadByte (&cls.netMessage);
+	}
 
 	// protocol changes
 	if (flags & PS_WEAPONFRAME) {
@@ -494,7 +538,7 @@ static void CL_ParsePacketEntities (const frame_t *oldFrame, frame_t *newFrame)
 
 	for ( ; ; ) {
 		newNum = CL_ParseEntityBits (&bits);
-		if (newNum >= CL_GetMaxEdicts())
+		if (newNum >= MAX_CS_EDICTS)
 			Com_Error (ERR_DROP, "CL_ParsePacketEntities: bad number:%i", newNum);
 
 		if (cls.netMessage.readCount > cls.netMessage.curSize)
@@ -694,6 +738,15 @@ static void CL_ParseFrame (int extraBits)
 	}
 	CL_ParsePlayerstate (oldFrame, &cl.frame, extraFlags);
 
+	// Q2Pro: consume delta-encoded clientNum after playerstate to keep stream in sync.
+	// In Q2Pro, the viewed player can change per-frame (spectating/MVD).
+	// EGL doesn't support per-frame clientNum switching yet, so just read and discard.
+	if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+		if (extraFlags & EPS_CLIENTNUM) {
+			MSG_ReadByte (&cls.netMessage); // consume clientNum byte
+		}
+	}
+
 	// Read packet entities
 	if (cls.serverProtocol < ENHANCED_PROTOCOL_VERSION) {
 		cmd = MSG_ReadByte (&cls.netMessage);
@@ -867,7 +920,8 @@ static qBool CL_ParseServerData (void)
 		if (newVersion >= MINOR_VERSION_Q2PRO_EXTENDED_LIMITS) {
 			int flags = MSG_ReadShort (&cls.netMessage);
 			cl.strafeHack = (flags & Q2PRO_PF_STRAFEJUMP_HACK) ? qTrue : qFalse;
-			// We currently ignore other Q2Pro flags.
+			cl.q2proExtensions = (flags & Q2PRO_PF_EXTENSIONS) ? qTrue : qFalse;
+			Com_DevPrintf (0, "Q2Pro protocol flags: 0x%04x (extensions=%d)\n", flags, cl.q2proExtensions);
 		}
 		else {
 			cl.strafeHack = MSG_ReadByte (&cls.netMessage) ? qTrue : qFalse;
@@ -981,7 +1035,12 @@ static void CL_ParseStartSoundPacket (void)
 	entChannel_t	entChannel;
 
 	flags = MSG_ReadByte (&cls.netMessage);
-	soundNum = MSG_ReadByte (&cls.netMessage);
+
+	// Q2Pro PF_EXTENSIONS: SND_INDEX16 means sound index is 16-bit
+	if (cl.q2proExtensions && (flags & SND_INDEX16))
+		soundNum = MSG_ReadShort (&cls.netMessage);
+	else
+		soundNum = MSG_ReadByte (&cls.netMessage);
 
 	// Volume
 	if (flags & SND_VOLUME)
@@ -1006,7 +1065,7 @@ static void CL_ParseStartSoundPacket (void)
 		// Entity reletive
 		entChannel = MSG_ReadShort (&cls.netMessage); 
 		entNum = entChannel >> 3;
-		if (entNum > CL_GetMaxEdicts())
+		if (entNum > MAX_CS_EDICTS)
 			Com_Error (ERR_DROP, "CL_ParseStartSoundPacket: entNum = %i", entNum);
 
 		entChannel &= 7;
@@ -1300,31 +1359,20 @@ void CL_ParseServerMessage (void)
 			CL_ParseDownload (qTrue);
 			break;
 
-		case SVC_PLAYERUPDATE:
-			// R1Q2-specific: svc_playerupdate (cmd 23) - player position updates
-			// This is NOT the same as Q2Pro's SVC_GAMESTATE which is also cmd 23
-			if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+		case SVC_GAMESTATE: // wire value 23: Q2Pro=gamestate, R1Q2=playerupdate
+			if (cls.serverProtocol == Q2PRO_PROTOCOL_VERSION) {
+				CL_ParseGamestate (SVC_GAMESTATE);
+			}
+			else if (cls.serverProtocol == ENHANCED_PROTOCOL_VERSION) {
+				// R1Q2-specific: svc_playerupdate (cmd 23) - player position updates
 				// R1Q2 player updates sent between frames for smoother player movement
-				// Format: framenum (long), then for each player that was in that frame: origin (3 shorts)
-				// 
-				// We need to figure out how many player positions follow. According to R1Q2:
-				// - The server iterates through all entities in the frame
-				// - For each entity where number <= maxclients, it writes position
-				// - The client must do the same iteration to know how many to read
-				//
 				// For now, since we don't properly track player update requests (CLSET_PLAYERUPDATE_REQUESTS),
 				// just skip this entire message by reading the framenum.
-				// If server sends player positions, they'll be misread and cause issues.
-				// But typically the server only sends these if client requests them.
 				MSG_ReadLong (&cls.netMessage); // framenum - discard
-				
-				// TODO: Properly implement player updates by tracking which entities
-				// in the referenced frame are players and reading their positions
 				Com_DevPrintf (0, "SVC_PLAYERUPDATE received but not fully implemented\n");
 			}
 			break;
 
-		case SVC_GAMESTATE:
 		case SVC_CONFIGSTRINGSTREAM:
 		case SVC_BASELINESTREAM:
 			if (cls.serverProtocol != Q2PRO_PROTOCOL_VERSION)
