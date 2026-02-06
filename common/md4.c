@@ -1,6 +1,7 @@
 /* GLOBAL.H - RSAREF types and constants */
 
 #include <string.h>
+#include <stdint.h>
 
 /* POINTER defines a generic pointer type */
 typedef unsigned char *POINTER;
@@ -9,11 +10,10 @@ typedef unsigned char *POINTER;
 typedef unsigned short int UINT2;
 
 /* UINT4 defines a four byte word */
-#ifdef __alpha__
-typedef unsigned int UINT4;
-#else
-typedef unsigned long int UINT4;
-#endif
+/* Fix: the original code used 'unsigned long int' which is 64 bits on
+   Linux x86_64 (LP64), breaking the MD4 algorithm that requires 32-bit
+   words.  uint32_t is exactly 32 bits on all platforms.  (GitHub #13) */
+typedef uint32_t UINT4;
 
   
 /* MD4.H - header file for MD4C.C */
