@@ -28,6 +28,9 @@ static unsigned g_pingTimestamp;
 static int g_pingStage;
 static int g_pingIndex;
 static int g_pingExtra;
+
+static void *cmd_sbRefresh;
+static void *cmd_sbList;
 static int g_pingTime;
 
 // Exported for menu access
@@ -416,28 +419,56 @@ static void SB_QueryMasters(void)
 		Com_Printf(0, "No master servers configured (sb_master1..%d).\n", SB_MAX_MASTERS);
 }
 
+/*
+=================
+SB_IsLikelyGameServer
+
+Returns true if 's' looks like a game server address (host:gameport) that was
+mistakenly placed in a master-server slot.  Game server addresses use ports
+in the 27910-27999 range; real Q2 masters use 27900, and HTTP masters start
+with "http".  We keep it simple: if it's not HTTP and the port is in the
+common game-server range, it's almost certainly wrong.
+=================
+*/
+static qBool SB_IsLikelyGameServer(const char *s)
+{
+	const char *colon;
+	int port;
+
+	if (!s || !s[0])
+		return qFalse;
+	if (SB_IsHTTPMaster(s))
+		return qFalse;
+
+	colon = strrchr(s, ':');
+	if (!colon)
+		return qFalse;
+
+	port = atoi(colon + 1);
+	// Standard Q2 game server ports are 27910+.  Master is 27900.
+	if (port >= 27910 && port <= 27999)
+		return qTrue;
+
+	return qFalse;
+}
+
 static void SB_RefreshMasterDefaults(void)
 {
-	// Make sure we have useful defaults even if:
-	// - config execution happens after SrvBrowser_Init
-	// - sb_master* are archived with stale values
-	const char *a0 = Cvar_GetStringValue("adr0");
-	const char *a1 = Cvar_GetStringValue("adr1");
+	// Replace empty, dead-id-master, or obviously-wrong game-server addresses
+	// with working HTTP master defaults.
 	const char *m1 = (sb_master[0] ? sb_master[0]->string : "");
 	const char *m2 = (sb_master[1] ? sb_master[1]->string : "");
 
-	if ((!m1[0] || !strcmp(m1, "192.246.40.37:27900"))) {
-		if (a0 && a0[0])
-			Cvar_Set("sb_master1", (char *)a0, qTrue);
-		else
-			Cvar_Set("sb_master1", "http://q2servers.com/?raw=2", qTrue);
+	if (!m1[0] || !strcmp(m1, "192.246.40.37:27900") || SB_IsLikelyGameServer(m1)) {
+		if (SB_IsLikelyGameServer(m1))
+			Com_Printf(0, "sb_master1 \"%s\" looks like a game server, resetting to HTTP master.\n", m1);
+		Cvar_Set("sb_master1", "http://q2servers.com/?raw=2", qTrue);
 	}
 
-	if ((!m2[0] || !strcmp(m2, "192.246.40.37:27900"))) {
-		if (a1 && a1[0])
-			Cvar_Set("sb_master2", (char *)a1, qTrue);
-		else
-			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
+	if (!m2[0] || !strcmp(m2, "192.246.40.37:27900") || SB_IsLikelyGameServer(m2)) {
+		if (SB_IsLikelyGameServer(m2))
+			Com_Printf(0, "sb_master2 \"%s\" looks like a game server, resetting to HTTP master.\n", m2);
+		Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 }
 
@@ -550,33 +581,28 @@ void SrvBrowser_Init(void)
 	sb_uselan = Cvar_Register("sb_uselan", "0", 0);
 	sb_debug = Cvar_Register("sb_debug", "0", 0);
 
-	// EGL historically uses adr0/adr1 for master hosts (see default configs).
-	sb_master[0] = Cvar_Register("sb_master1", Cvar_GetStringValue("adr0"), 0);
-	sb_master[1] = Cvar_Register("sb_master2", Cvar_GetStringValue("adr1"), 0);
+	// Register master server cvars with sensible HTTP defaults.
+	// NOTE: adr0/adr1 are address-book entries for individual game servers
+	// (port 27910), NOT master servers.  Never inherit from them.
+	sb_master[0] = Cvar_Register("sb_master1", "http://q2servers.com/?raw=2", 0);
+	sb_master[1] = Cvar_Register("sb_master2", "http://q2servers.com/?raw=1", 0);
 	sb_master[2] = Cvar_Register("sb_master3", "", 0);
 	sb_master[3] = Cvar_Register("sb_master4", "", 0);
 
-	// If the user still has the old hardcoded id master (often dead in 2026),
-	// or the sb_master slots are empty, provide working HTTP master defaults.
+	// If the user still has the old dead id Software master, replace it.
 	{
-		const char *a0 = Cvar_GetStringValue("adr0");
-		const char *a1 = Cvar_GetStringValue("adr1");
 		const char *m1 = sb_master[0] ? sb_master[0]->string : "";
 		const char *m2 = sb_master[1] ? sb_master[1]->string : "";
 
-		if (a0 && a0[0] && (!m1[0] || !strcmp(m1, "192.246.40.37:27900")))
-			Cvar_Set("sb_master1", (char *)a0, qTrue);
-		else if (!m1[0] || !strcmp(m1, "192.246.40.37:27900"))
+		if (!m1[0] || !strcmp(m1, "192.246.40.37:27900"))
 			Cvar_Set("sb_master1", "http://q2servers.com/?raw=2", qTrue);
 
-		if (a1 && a1[0] && (!m2[0] || !strcmp(m2, "192.246.40.37:27900")))
-			Cvar_Set("sb_master2", (char *)a1, qTrue);
-		else if (!m2[0] || !strcmp(m2, "192.246.40.37:27900"))
+		if (!m2[0] || !strcmp(m2, "192.246.40.37:27900"))
 			Cvar_Set("sb_master2", "http://q2servers.com/?raw=1", qTrue);
 	}
 
-	Cmd_AddCommand("sb_refresh", SrvBrowser_Refresh_f, "Refresh server list");
-	Cmd_AddCommand("sb_list", SrvBrowser_List_f, "List servers in console");
+	cmd_sbRefresh = Cmd_AddCommand("sb_refresh", SrvBrowser_Refresh_f, "Refresh server list");
+	cmd_sbList = Cmd_AddCommand("sb_list", SrvBrowser_List_f, "List servers in console");
 }
 
 /*
@@ -587,8 +613,8 @@ SrvBrowser_Shutdown
 void SrvBrowser_Shutdown(void)
 {
 	SB_ClearServers();
-	Cmd_RemoveCommand("sb_refresh", "Refresh server list");
-	Cmd_RemoveCommand("sb_list", "List servers in console");
+	Cmd_RemoveCommand("sb_refresh", cmd_sbRefresh);
+	Cmd_RemoveCommand("sb_list", cmd_sbList);
 }
 
 /*

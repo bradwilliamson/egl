@@ -943,7 +943,25 @@ static void CL_ConnectionlessPacket (void)
 	int rawLen;
 
 	MSG_BeginReading (&cls.netMessage);
-	assert (MSG_ReadLong (&cls.netMessage) == -1);	// Skip the -1
+	MSG_ReadLong (&cls.netMessage);	// Skip the -1 (connectionless header)
+
+	// sb_debug>=1: show every incoming connectionless packet source + first bytes
+	if (Cvar_GetIntegerValue("sb_debug") >= 1) {
+		const byte *dbg = cls.netMessage.data + 4;
+		int dbgLen = (int)cls.netMessage.curSize - 4;
+		char preview[64];
+		int pLen = (dbgLen > 32) ? 32 : dbgLen;
+		int pi;
+		for (pi = 0; pi < pLen; pi++) {
+			if (dbg[pi] >= 32 && dbg[pi] < 127)
+				preview[pi] = (char)dbg[pi];
+			else
+				preview[pi] = '.';
+		}
+		preview[pLen] = 0;
+		Com_Printf(0, "[sb_debug] OOB packet from %s (%d bytes): [%s]\n",
+			NET_AdrToString(&cls.netFrom), dbgLen, preview);
+	}
 
 	// Master server replies contain binary address/port bytes immediately after
 	// the ASCII prefix (e.g. "servers"), so they must be detected/handled
@@ -966,6 +984,9 @@ static void CL_ConnectionlessPacket (void)
 		if (pfxLen) {
 			const byte *payload = raw + pfxLen;
 			size_t payloadLen = (size_t)(rawLen - pfxLen);
+			if (Cvar_GetIntegerValue("sb_debug") >= 1)
+				Com_Printf(0, "[sb_debug] Matched master prefix (%d chars), payload %u bytes from %s\n",
+					pfxLen, (unsigned)payloadLen, NET_AdrToString(&cls.netFrom));
 			while (payloadLen && (*payload == ' ' || *payload == '\n' || *payload == '\r' || *payload == '\t')) {
 				payload++;
 				payloadLen--;

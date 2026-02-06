@@ -86,6 +86,74 @@ char *Sys_DefaultBaseDir (void)
 	return sys_defaultBaseDir[0] ? sys_defaultBaseDir : ".";
 }
 
+/*
+=================
+Sys_PruneCrashDumps
+
+Keep only the newest MAX_CRASH_DUMPS .dmp files in the crashdumps/ directory.
+Oldest files (by name, which embeds a timestamp) are deleted first.
+Called at startup so users never accumulate unbounded disk usage.
+=================
+*/
+#define MAX_CRASH_DUMPS		5
+
+static void Sys_PruneCrashDumps (void)
+{
+	WIN32_FIND_DATAA fd;
+	HANDLE hFind;
+	char pattern[MAX_OSPATH];
+	char dir[MAX_OSPATH];
+
+	// Pairs: .dmp + .txt share the same base name
+	char names[256][MAX_OSPATH];
+	int count = 0;
+
+	Q_snprintfz (dir, sizeof (dir), "crashdumps");
+	Q_snprintfz (pattern, sizeof (pattern), "%s\\egl_*.dmp", dir);
+
+	hFind = FindFirstFileA (pattern, &fd);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return;
+
+	do {
+		if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && count < 256)
+			Q_strncpyz (names[count++], fd.cFileName, MAX_OSPATH);
+	} while (FindNextFileA (hFind, &fd));
+	FindClose (hFind);
+
+	if (count <= MAX_CRASH_DUMPS)
+		return;
+
+	// Sort ascending by name (timestamps in the filename make this chronological)
+	for (int i = 0; i < count - 1; i++) {
+		for (int j = i + 1; j < count; j++) {
+			if (strcmp (names[i], names[j]) > 0) {
+				char tmp[MAX_OSPATH];
+				Q_strncpyz (tmp, names[i], MAX_OSPATH);
+				Q_strncpyz (names[i], names[j], MAX_OSPATH);
+				Q_strncpyz (names[j], tmp, MAX_OSPATH);
+			}
+		}
+	}
+
+	// Delete oldest, keeping only the last MAX_CRASH_DUMPS
+	for (int i = 0; i < count - MAX_CRASH_DUMPS; i++) {
+		char path[MAX_OSPATH];
+		char *dot;
+
+		// Delete .dmp
+		Q_snprintfz (path, sizeof (path), "%s\\%s", dir, names[i]);
+		DeleteFileA (path);
+
+		// Delete matching .txt (same base name, different extension)
+		dot = strrchr (path, '.');
+		if (dot) {
+			strcpy (dot, ".txt");
+			DeleteFileA (path);
+		}
+	}
+}
+
 static void Sys_WriteMiniDump (EXCEPTION_POINTERS *exception)
 {
 	HANDLE hFile;
@@ -127,6 +195,9 @@ static void Sys_WriteMiniDump (EXCEPTION_POINTERS *exception)
 		fclose (f);
 	}
 
+	// MiniDumpNormal: stack traces + thread context only (~200KB vs ~37MB).
+	// The fat flags (MiniDumpWithDataSegs etc.) included heap/global data
+	// that isn't useful without private symbols and caused 37MB dumps.
 	hFile = CreateFileA (dumpPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hFile != INVALID_HANDLE_VALUE) {
 		MINIDUMP_EXCEPTION_INFORMATION mdei;
@@ -138,7 +209,7 @@ static void Sys_WriteMiniDump (EXCEPTION_POINTERS *exception)
 			GetCurrentProcess (),
 			GetCurrentProcessId (),
 			hFile,
-			(MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory),
+			MiniDumpNormal,
 			exception ? &mdei : NULL,
 			NULL,
 			NULL);
@@ -184,6 +255,9 @@ void Sys_Init (void)
 		SetUnhandledExceptionFilter (Sys_UnhandledExceptionFilter);
 		sys_minidump_installed = qTrue;
 	}
+
+	// Clean up old crash dumps so they don't eat the user's disk
+	Sys_PruneCrashDumps ();
 }
 
 
