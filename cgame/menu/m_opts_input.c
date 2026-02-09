@@ -154,9 +154,30 @@ static void SensitivityFunc (void *unused)
 	m_inputMenu.sensitivity_amount.generic.name = cgi.Cvar_GetStringValue ("sensitivity");
 }
 
+static float InputMenu_MouseAccelFromIndex (int index)
+{
+	static float accelValues[] = { 0.0f, 0.5f, 1.0f };
+
+	if (index < 0)
+		index = 0;
+	else if (index > 2)
+		index = 2;
+
+	return accelValues[index];
+}
+
+static int InputMenu_MouseAccelToIndex (float accel)
+{
+	if (accel < 0.25f)
+		return 0;
+	if (accel < 0.75f)
+		return 1;
+	return 2;
+}
+
 static void MouseAccelFunc (void *unused)
 {
-	cgi.Cvar_SetValue ("m_accel", m_inputMenu.maccel_list.curValue, qFalse);
+	cgi.Cvar_SetValue ("m_accel", InputMenu_MouseAccelFromIndex (m_inputMenu.maccel_list.curValue), qFalse);
 }
 
 static void InvertMouseFunc (void *unused)
@@ -229,8 +250,8 @@ static void InputMenu_SetValues (void)
 	m_inputMenu.sensitivity_slider.curValue		= (cgi.Cvar_GetFloatValue ("sensitivity")) * 2;
 	m_inputMenu.sensitivity_amount.generic.name	= cgi.Cvar_GetStringValue ("sensitivity");
 
-	cgi.Cvar_SetValue ("m_accel",					clamp (cgi.Cvar_GetIntegerValue ("m_accel"), 0, 2), qFalse);
-	m_inputMenu.maccel_list.curValue				= cgi.Cvar_GetIntegerValue ("m_accel");
+	cgi.Cvar_SetValue ("m_accel",					clamp (cgi.Cvar_GetFloatValue ("m_accel"), 0.0f, 1.0f), qFalse);
+	m_inputMenu.maccel_list.curValue				= InputMenu_MouseAccelToIndex (cgi.Cvar_GetFloatValue ("m_accel"));
 
 	m_inputMenu.invert_mouse_toggle.curValue		= (!!(cgi.Cvar_GetFloatValue ("m_pitch") < 0));
 
@@ -262,9 +283,9 @@ static void InputMenu_Init (void)
 	};
 
 	static char *maccel_items[] = {
-		"no accel",
-		"normal",
-		"os values",
+		"off",
+		"medium",
+		"high",
 		0
 	};
 
@@ -391,7 +412,7 @@ static void InputMenu_Init (void)
 	m_inputMenu.maccel_list.generic.name		= "Mouse accel";
 	m_inputMenu.maccel_list.generic.callBack	= MouseAccelFunc;
 	m_inputMenu.maccel_list.itemNames			= maccel_items;
-	m_inputMenu.maccel_list.generic.statusBar	= "Mouse Acceleration options";
+	m_inputMenu.maccel_list.generic.statusBar	= "Mouse acceleration amount";
 
 	m_inputMenu.autosensitivity_toggle.generic.type			= UITYPE_SPINCONTROL;
 	m_inputMenu.autosensitivity_toggle.generic.name			= "Auto sensitivity";
