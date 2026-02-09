@@ -32,11 +32,15 @@ cVar_t	*cl_sidespeed;
 
 cVar_t	*cl_yawspeed;
 cVar_t	*cl_pitchspeed;
+cVar_t	*m_accel;
 
 static cVar_t	*autosensitivity;
 static cVar_t	*cl_anglespeedkey;
 static cVar_t	*cl_run;
 static cVar_t	*m_filter;
+// Legacy compatibility alias for older EGL configs.
+static cVar_t	*m_accel2;
+static cVar_t	*m_autosens;
 
 static cVar_t	*_zoomfov;
 static qBool	cl_zoomActive;
@@ -49,6 +53,9 @@ static uint32	in_frameMSec;
 static ivec2_t	in_mouseMove;
 static ivec2_t	in_lastMouseMove;
 static qBool	in_mLooking;
+static qBool	in_legacyAccelWarned;
+static float	in_autoSensX = 1.0f / 90.0f;
+static float	in_autoSensY = 1.0f / 90.0f;
 
 /*
 ============
@@ -385,6 +392,59 @@ void CL_MoveMouse (int xMove, int yMove)
 }
 
 /*
+================
+CL_UpdateAutoSensitivity
+================
+*/
+static void CL_UpdateAutoSensitivity (void)
+{
+	float fov;
+
+	if (!m_autosens)
+		return;
+
+	// Values > 90 pick the base horizontal FOV used for autosens scaling.
+	if (m_autosens->floatVal > 90.0f && m_autosens->floatVal <= 179.0f)
+		fov = m_autosens->floatVal;
+	else
+		fov = 90.0f;
+
+	in_autoSensX = 1.0f / fov;
+	in_autoSensY = 1.0f / Q_CalcFovY (fov, 4.0f, 3.0f);
+	m_autosens->modified = qFalse;
+}
+
+/*
+================
+CL_ApplyLegacyAccelAlias
+================
+*/
+static void CL_ApplyLegacyAccelAlias (qBool force)
+{
+	if (!m_accel2 || !m_accel || !m_accel2->modified)
+		return;
+
+	// Ignore untouched legacy default during startup.
+	if (!force && fabsf (m_accel2->floatVal) <= 0.0001f) {
+		m_accel2->modified = qFalse;
+		return;
+	}
+
+	// Startup import: only pull m_accel2 when m_accel is still default-like.
+	// Runtime alias: always apply when force is true.
+	if (force || fabsf (m_accel->floatVal) <= 0.0001f) {
+		Cvar_VariableSetValue (m_accel, m_accel2->floatVal, qFalse);
+
+		if (!in_legacyAccelWarned) {
+			Com_Printf (PRNT_WARNING, "m_accel2 is deprecated; use m_accel\n");
+			in_legacyAccelWarned = qTrue;
+		}
+	}
+
+	m_accel2->modified = qFalse;
+}
+
+/*
 =============================================================================
 
 	MOVE USER COMMAND
@@ -482,7 +542,8 @@ Add mouse X/Y movement to cmd
 */
 static void CL_MouseMove (userCmd_t *cmd)
 {
-	ivec2_t			move;
+	vec2_t			move;
+	float			scale;
 
 	// Movement filtering
 	if (m_filter->intVal) {
@@ -496,18 +557,44 @@ static void CL_MouseMove (userCmd_t *cmd)
 	in_lastMouseMove[0] = in_mouseMove[0];
 	in_lastMouseMove[1] = in_mouseMove[1];
 
-	// Zooming in preserves sensitivity
-	if (autosensitivity->intVal) {
-		move[0] *= sensitivity->floatVal * (cl.refDef.fovX/90.0f);
-		move[1] *= sensitivity->floatVal * (cl.refDef.fovY/90.0f);
+	// Backward-compat for old EGL configs/scripts using m_accel2.
+	CL_ApplyLegacyAccelAlias (qTrue);
+
+	// In-engine accel curve (m_accel 0..1).
+	scale = sensitivity->floatVal;
+	if (m_accel && m_accel->floatVal > 0.0f) {
+		float accel = m_accel->floatVal;
+		float speed;
+
+		if (accel < 0.0f)
+			accel = 0.0f;
+		if (accel > 1.0f)
+			accel = 1.0f;
+
+		speed = sqrtf (move[0]*move[0] + move[1]*move[1]);
+		scale += speed * accel;
 	}
-	else {
-		move[0] *= sensitivity->floatVal;
-		move[1] *= sensitivity->floatVal;
+
+	move[0] *= scale;
+	move[1] *= scale;
+
+	// Autosens path: non-zero m_autosens enables it and values > 90
+	// select the base horizontal FOV used for scaling.
+	if (m_autosens && m_autosens->modified)
+		CL_UpdateAutoSensitivity ();
+
+	if (m_autosens && m_autosens->intVal) {
+		move[0] *= cl.refDef.fovX * in_autoSensX;
+		move[1] *= cl.refDef.fovY * in_autoSensY;
+	}
+	else if (autosensitivity->intVal) {
+		// Legacy EGL behavior kept for backward compatibility.
+		move[0] *= (cl.refDef.fovX / 90.0f);
+		move[1] *= (cl.refDef.fovY / 90.0f);
 	}
 
 	// Side/yaw movement
-	if (CL_GetStrafeState () || (lookstrafe->intVal && in_mLooking))
+	if (CL_GetStrafeState () || (lookstrafe->intVal && !in_mLooking))
 		cmd->sideMove += m_side->floatVal * move[0];
 	else
 		cl.viewAngles[YAW] -= m_yaw->floatVal * move[0];
@@ -765,6 +852,13 @@ void CL_InputInit (void)
 	cl_anglespeedkey	= Cvar_Register ("cl_anglespeedkey",	"1.5",		0);
 
 	m_filter			= Cvar_Register ("m_filter",			"0",		0);
+	m_accel			= Cvar_Register ("m_accel",			"0",		CVAR_ARCHIVE);
+	m_accel2			= Cvar_Register ("m_accel2",			"0",		0);
+	m_autosens			= Cvar_Register ("m_autosens",			"0",		CVAR_ARCHIVE);
+
+	// One-time import path for old cfg files that still define m_accel2.
+	CL_ApplyLegacyAccelAlias (qFalse);
+	CL_UpdateAutoSensitivity ();
 
 	// Commands
 	Cmd_AddCommand ("centerview",	IN_CenterView_f,	"Centers the view");

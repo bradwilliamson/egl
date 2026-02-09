@@ -1,5 +1,7 @@
 # Basic Makefile for EGL Quake 2 on MinGW (Windows)
 CC ?= gcc
+RC ?= windres
+RCFLAGS ?=
 
 # Some Windows environments set CC=cc by default, but don't actually provide a 'cc' executable.
 # If the caller wants a specific compiler, they can still override CC on the command line.
@@ -40,6 +42,8 @@ LIBARCH = x64
 CGAME_DLL = eglcgame$(LIBARCH).dll
 GAME_DLL = game$(LIBARCH).dll
 DLL_LDFLAGS = -m64 -shared
+WIN_RC_SRC = win32/EGL.rc
+WIN_RC_OBJ = win32/EGL.res.o
 
 # Source files (adjust paths as needed)
 SHARED_SRC = $(wildcard shared/*.c)
@@ -81,7 +85,7 @@ debug:
 	$(MAKE) clean
 	$(MAKE) all CFLAGS="$(DBG_CFLAGS)" LDFLAGS="$(DBG_LDFLAGS)"
 
-egl.exe: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ)
+egl.exe: $(COMMON_OBJ) $(CLIENT_OBJ) $(RENDERER_OBJ) $(SERVER_OBJ) $(WIN_RC_OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 ifdef USE_SDL2
 	-powershell -NoProfile -Command "if (Test-Path -LiteralPath '$(SDL2_DLL_SRC)') { Copy-Item -Force -LiteralPath '$(SDL2_DLL_SRC)' -Destination 'SDL2.dll' } else { throw 'SDL2.dll not found at $(SDL2_DLL_SRC). Install MSYS2 SDL2 for your prefix (e.g. mingw-w64-x86_64-SDL2) or set EGL_MSYS2_ROOT/EGL_MSYS2_PREFIX.' }"
@@ -103,8 +107,11 @@ egl-dedicated.exe: $(COMMON_OBJ) $(SERVER_OBJ) $(GAME_OBJ)
 	@$(MAKE) eglded.exe
 	@powershell -NoProfile -Command "Copy-Item -Force eglded.exe egl-dedicated.exe"
 
-eglded.exe: $(DED_COMMON_OBJ) $(DED_SERVER_OBJ) $(DED_SYS_OBJ)
+eglded.exe: $(DED_COMMON_OBJ) $(DED_SERVER_OBJ) $(DED_SYS_OBJ) $(WIN_RC_OBJ)
 	$(CC) -o $@ $^ $(DED_LDFLAGS)
+
+$(WIN_RC_OBJ): $(WIN_RC_SRC) win32/resource.h favicon.ico
+	$(RC) $(RCFLAGS) -I./win32 -O coff -o $@ $<
 
 dedicated: egl-dedicated.exe
 

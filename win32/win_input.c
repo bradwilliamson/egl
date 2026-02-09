@@ -221,7 +221,7 @@ qBool In_GetKeyState (keyNum_t keyNum)
 */
 
 // mouse variables
-cVar_t		*m_accel;
+static cVar_t	*in_win32_maccel;
 cVar_t		*in_mouse;
 cVar_t		*in_rawinput;
 
@@ -267,14 +267,15 @@ static void IN_ActivateMouse (void)
 
 	in_mActive = qTrue;
 
-	if (in_mValidSPI) {
+	// Only touch system mouse acceleration when raw input is disabled.
+	if (in_mValidSPI && (!in_rawinput || !in_rawinput->intVal)) {
 		// Sanity check
-		if (m_accel->intVal < 0 || m_accel->intVal > 2) {
-			Com_Printf (PRNT_WARNING, "WARNING: invalid m_accel value '%i', forcing default!\n", m_accel->intVal);
-			Cvar_VariableReset (m_accel, qTrue);
+		if (in_win32_maccel->intVal < 0 || in_win32_maccel->intVal > 2) {
+			Com_Printf (PRNT_WARNING, "WARNING: invalid in_win32_maccel value '%i', forcing default!\n", in_win32_maccel->intVal);
+			Cvar_VariableReset (in_win32_maccel, qTrue);
 		}
 
-		switch (m_accel->intVal) {
+		switch (in_win32_maccel->intVal) {
 		case 2:
 			// OS parameters
 			in_mRestoreSPI = SystemParametersInfo (SPI_SETMOUSE, 0, in_mOSSPI, 0);
@@ -572,6 +573,7 @@ static DWORD	joy_Flags;
 static DWORD	joy_NumButtons;
 
 static JOYINFOEX	ji;
+static void IN_StartupJoystick (void);
 
 static void IN_UpdateJoystickEnabled (void)
 {
@@ -1000,9 +1002,13 @@ void IN_Frame (void)
 		return;
 	}
 
-	if (m_accel->modified || (m_accel->intVal == 1 && sensitivity->modified)) {
-		if (m_accel->modified)
-			m_accel->modified = qFalse;
+	if ((in_rawinput && in_rawinput->modified)
+	|| in_win32_maccel->modified
+	|| ((!in_rawinput || !in_rawinput->intVal) && in_win32_maccel->intVal == 1 && sensitivity->modified)) {
+		if (in_rawinput && in_rawinput->modified)
+			in_rawinput->modified = qFalse;
+		if (in_win32_maccel->modified)
+			in_win32_maccel->modified = qFalse;
 		if (sensitivity->modified)
 			sensitivity->modified = qFalse;
 
@@ -1084,7 +1090,7 @@ void IN_Init (void)
 	Com_Printf (0, "\n--------- Input Initialization ---------\n");
 
 	// Mouse variables
-	m_accel					= Cvar_Register ("m_accel",						"1",		CVAR_ARCHIVE);
+	in_win32_maccel		= Cvar_Register ("in_win32_maccel",				"1",		CVAR_ARCHIVE);
 	in_mouse				= Cvar_Register ("in_mouse",					"1",		CVAR_ARCHIVE);
 
 	// Joystick variables

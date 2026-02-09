@@ -13,6 +13,26 @@ Expect the build system and platform backends to continue evolving.
 - `gl_coloredlightmaps`: older EGL builds could have this cvar set via configs, but it was not actually implemented in the renderer. This repo now implements it for Quake II BSP lightmaps.
 - SDL2 + `vid_restart`: the SDL2 backend now restores mouse grab/relative mode and hides the OS cursor after a restart.
 
+## Input migration notes (January 2026)
+
+- `m_accel` now controls in-engine mouse acceleration (`0..1`).
+- Windows OS mouse acceleration control moved to `in_win32_maccel` (`0/1/2`).
+- `m_accel2` is kept as a legacy alias for older configs.
+
+Recommended baseline:
+
+```cfg
+seta in_rawinput 1
+seta in_win32_maccel 1
+seta m_accel 0
+seta m_accel2 0
+seta m_autosens 1
+seta m_filter 0
+seta sensitivity 3
+seta m_yaw 0.022
+seta m_pitch 0.022
+```
+
 ## Running
 EGL is an engine; it expects Quake II base game data to be present.
 
