@@ -350,15 +350,6 @@ if (-not $NoPkzCopy) {
     }
 }
 
-# Stage default config (fresh installs won't have it yet)
-$cfg = Join-Path $root 'eglcfg.cfg'
-if (Test-Path -LiteralPath $cfg) {
-    Copy-Item -Force -Path $cfg -Destination (Join-Path $outBase 'eglcfg.cfg')
-}
-else {
-    Write-Warning "Did not find eglcfg.cfg; output will not have default archived cvars until one is generated."
-}
-
 # Fail fast if any staged binary/DLL depends on a non-system DLL that wasn't staged.
 Test-StagedDependencies -Objdump $objdump -OutRoot $outRoot -OutBase $outBase
 

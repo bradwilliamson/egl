@@ -32,6 +32,18 @@ $env:MSYS2_PREFIX = $prefix
 if (-not $env:MSYS2_ROOT) { $env:MSYS2_ROOT = $msys2Root }
 if (-not $env:EGL_MSYS2_ROOT) { $env:EGL_MSYS2_ROOT = $msys2Root }
 
-Write-Host "Build: MSYS2_ROOT=$msys2Root EGL_MSYS2_PREFIX=$prefix" -ForegroundColor Cyan
-& make @MakeArgs
+# Renderer build configuration (default: legacy-only)
+$eglLegacy = if ($env:EGL_LEGACY) { $env:EGL_LEGACY } else { '1' }
+$eglModern = if ($env:EGL_MODERN) { $env:EGL_MODERN } else { '0' }
+
+# Determine SDL2 status
+$sdl2Status = if ($env:USE_SDL2 -eq '1') { '1' } else { '0' }
+
+# Print build configuration banner
+Write-Host "Build: SDL2=$sdl2Status LEGACY=$eglLegacy MODERN=$eglModern" -ForegroundColor Cyan
+
+# Pass renderer config to make
+$makeArgsWithConfig = @("EGL_LEGACY=$eglLegacy", "EGL_MODERN=$eglModern") + $MakeArgs
+
+& make @makeArgsWithConfig
 exit $LASTEXITCODE

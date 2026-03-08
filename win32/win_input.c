@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "../client/cl_local.h"
 #include "win_local.h"
 
+static void IN_StartupJoystick (void);
+
 /*
 =========================================================================
 
@@ -79,7 +81,7 @@ static byte scanToKey[128] = {
 	0,			0,			0,			0,			0,			0,			0,			0,
 	0,			0,			0,			0,			0,			0,			0,			0		// 7
 };
-keyNum_t In_MapKey (int wParam, int lParam)
+int In_MapKey (int wParam, int lParam)
 {
 	int		modified;
 #ifdef NEWKBCODE
@@ -206,6 +208,7 @@ qBool In_GetKeyState (keyNum_t keyNum)
 {
 	switch (keyNum) {
 	case K_CAPSLOCK:		return (GetKeyState (VK_CAPITAL)) ? qTrue : qFalse;
+	default:				break;
 	}
 
 	Com_Printf (PRNT_ERROR, "In_GetKeyState: Invalid key");
@@ -573,7 +576,6 @@ static DWORD	joy_Flags;
 static DWORD	joy_NumButtons;
 
 static JOYINFOEX	ji;
-static void IN_StartupJoystick (void);
 
 static void IN_UpdateJoystickEnabled (void)
 {
@@ -1090,7 +1092,7 @@ void IN_Init (void)
 	Com_Printf (0, "\n--------- Input Initialization ---------\n");
 
 	// Mouse variables
-	in_win32_maccel		= Cvar_Register ("in_win32_maccel",				"1",		CVAR_ARCHIVE);
+	in_win32_maccel			= Cvar_Register ("in_win32_maccel",				"1",		CVAR_ARCHIVE);
 	in_mouse				= Cvar_Register ("in_mouse",					"1",		CVAR_ARCHIVE);
 
 	// Joystick variables

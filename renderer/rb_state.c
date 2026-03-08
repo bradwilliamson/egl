@@ -25,6 +25,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "rb_local.h"
 
+#if EGL_MODERN_RENDERER
+# include "modern/rm_backend.h"
+#endif
+
 rb_glState_t	rb_glState;
 
 /*
@@ -440,7 +444,15 @@ void RB_ClearBuffers (void)
 
 	clearBits = GL_DEPTH_BUFFER_BIT;
 	if (gl_clear->intVal) {
+#if EGL_MODERN_RENDERER
+		if (RM_GetActiveBackend()) {
+			qglClearColor (0.0f, 1.0f, 1.0f, 1.0f); // CYAN
+		} else {
+			qglClearColor (0.5f, 0.5f, 0.5f, 1.0f);
+		}
+#else
 		qglClearColor (0.5f, 0.5f, 0.5f, 1.0f);
+#endif
 		clearBits |= GL_COLOR_BUFFER_BIT;
 	}
 

@@ -36,12 +36,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # include <windows.h>
 #endif
 
-#include <GL/gl.h>
 #include <math.h>
 
+#include "r_buildflags.h"
 #include "r_public.h"
 #include "r_typedefs.h"
-#include "rb_qgl.h"
+
+#ifndef RM_NO_LEGACY_GL
+# include <GL/gl.h>
+# include "rb_qgl.h"
+#endif
+
 #include "rf_image.h"
 #include "rf_program.h"
 #include "rf_material.h"
@@ -897,6 +902,13 @@ extern cVar_t	*r_sphereCull;
 extern cVar_t	*r_swapInterval;
 extern cVar_t	*r_textureBits;
 extern cVar_t	*r_times;
+
+extern cVar_t	*r_backend;
+#if EGL_MODERN_RENDERER
+extern cVar_t	*rm_test_triangle;
+extern cVar_t	*rm_use_fbo;
+extern cVar_t	*r_persistent_map;
+#endif
 extern cVar_t	*r_vertexLighting;
 extern cVar_t	*r_zFarAbs;
 extern cVar_t	*r_zFarMin;

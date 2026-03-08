@@ -369,6 +369,10 @@ static qBool R_CheckLoadSky (mBspNode_t *node)
 R_SetSky
 ============
 */
+#if EGL_MODERN_RENDERER
+extern void RM_Sky_SetTextures(const char *baseName);
+#endif
+
 void R_SetSky (char *name, float rotate, vec3_t axis)
 {
 	char	pathName[MAX_QPATH];
@@ -394,6 +398,11 @@ void R_SetSky (char *name, float rotate, vec3_t axis)
 		if (!r_skyState.materials[i])
 			r_skyState.materials[i] = r_noMaterialSky;
 	}
+	
+#if EGL_MODERN_RENDERER
+	/* Notify modern renderer of sky change */
+	RM_Sky_SetTextures(name);
+#endif
 }
 
 /*

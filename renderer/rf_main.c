@@ -23,6 +23,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "rf_local.h"
 
+#if EGL_MODERN_RENDERER
+# include "modern/rm_backend.h"
+# include "modern/rm_world.h"
+# include "glad/glad.h"
+# warning "Modern renderer enabled"
+#endif
+
 refInfo_t	ri;
 
 /*
@@ -215,6 +222,24 @@ Updates scene based on cvar changes
 */
 static void R_UpdateCvars (void)
 {
+	// Backend switching
+	if (r_backend && r_backend->modified) {
+		r_backend->modified = qFalse;
+#if EGL_MODERN_RENDERER
+		extern qBool RM_SetBackend (const char *name);
+		if (r_backend->string && !RM_SetBackend (r_backend->string)) {
+			Com_Printf (PRNT_WARNING, "Failed to set backend, reverting to legacy\n");
+			Cvar_VariableSet (r_backend, "legacy", qTrue);
+		}
+#else
+		// Modern backend not available in this build
+		if (r_backend->string && Q_stricmp (r_backend->string, "legacy")) {
+			Com_Printf (PRNT_WARNING, "r_backend: Modern backend not available in this build\n");
+			Cvar_VariableSet (r_backend, "legacy", qTrue);
+		}
+#endif
+	}
+
 	// Draw buffer stuff
 	if (gl_drawbuffer->modified) {
 		gl_drawbuffer->modified = qFalse;
@@ -284,6 +309,15 @@ void R_RenderToList (refDef_t *rd, meshList_t *list)
 		startTime = Sys_UMilliseconds ();
 
 	ri.def = *rd;
+#if EGL_MODERN_RENDERER
+	/* Ensure legacy viewport is never 0x0 when drawing to FBO (e.g. map load) */
+	if (ri.def.width <= 0 && ri.config.vidWidth > 0)
+		ri.def.width = ri.config.vidWidth;
+	if (ri.def.height <= 0 && ri.config.vidHeight > 0)
+		ri.def.height = ri.config.vidHeight;
+	if (ri.def.width <= 0) ri.def.width = 1;
+	if (ri.def.height <= 0) ri.def.height = 1;
+#endif
 	r_currentList = list;
 
 	for (i=0 ; i<MAX_MESH_KEYS ; i++)
@@ -321,6 +355,63 @@ R_RenderScene
 */
 void R_RenderScene (refDef_t *rd)
 {
+#if EGL_MODERN_RENDERER
+	if (RM_IsModernBackendActive()) {
+		/*
+		 * Modern path: draw 3D here so cgame's SCR_Draw() (HUD/menu) happens AFTER 3D,
+		 * matching the legacy ordering.
+		 */
+		if (r_noRefresh->intVal)
+			return;
+
+		/* Safety check: ensure world model is valid and loaded */
+		if (!ri.scn.worldModel || !ri.scn.worldModel->touchFrame) {
+			if (!(rd->rdFlags & RDF_NOWORLDMODEL)) {
+				/* Don't crash, just skip rendering world if not ready (e.g. during loading) */
+				return;
+			}
+		}
+
+		/* Keep refDef and viewport sane for any code relying on ri.def. */
+		ri.def = *rd;
+		if (ri.def.width <= 0 && ri.config.vidWidth > 0)
+			ri.def.width = ri.config.vidWidth;
+		if (ri.def.height <= 0 && ri.config.vidHeight > 0)
+			ri.def.height = ri.config.vidHeight;
+		if (ri.def.width <= 0) ri.def.width = 1;
+		if (ri.def.height <= 0) ri.def.height = 1;
+
+		/* Ensure we don't blit an FBO over 2D UI/HUD later in EndFrame. */
+		extern cVar_t *rm_use_fbo;
+		if (rm_use_fbo && rm_use_fbo->intVal != 0)
+			Cvar_VariableSetValue (rm_use_fbo, 0, qFalse);
+
+		RM_DrawWorld (rd);
+
+		/*
+		 * CRITICAL: Modern rendering uses core-profile GL (VAOs, shaders, VBOs).
+		 * Legacy 2D uses fixed-function (glBegin/glEnd, glVertex, etc).
+		 * We must completely reset GL state to make legacy draws work.
+		 */
+		
+		/* Unbind modern GL objects that interfere with legacy fixed-function */
+		glUseProgram (0);                    /* Disable shaders - use fixed function */
+		glBindVertexArray (0);               /* Unbind VAO - legacy uses client arrays */
+		glBindBuffer (GL_ARRAY_BUFFER, 0);   /* Unbind VBO */
+		glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+		
+		/* Reset texture state */
+		glActiveTexture (GL_TEXTURE0);
+		glBindTexture (GL_TEXTURE_2D, 0);
+		
+		/* Restore legacy fixed-function state for subsequent 2D draws (HUD/menu). */
+		RB_SetDefaultState ();
+		RB_SetupGL2D ();
+
+		return;
+	}
+#endif
+
 	if (r_noRefresh->intVal)
 		return;
 
@@ -335,6 +426,7 @@ void R_RenderScene (refDef_t *rd)
 		qglFinish ();
 
 	R_RenderToList (rd, &r_worldList);
+
 	R_SetLightLevel ();
 
 #ifdef SHADOW_VOLUMES
@@ -384,6 +476,7 @@ void R_BeginFrame (float cameraSeparation)
 }
 
 
+
 /*
 ==================
 R_EndFrame
@@ -391,6 +484,11 @@ R_EndFrame
 */
 void R_EndFrame (void)
 {
+#if EGL_MODERN_RENDERER
+	// Call modern backend end frame if active
+	RM_Backend_EndFrame ();
+#endif
+
 	// Update the backend
 	RB_EndFrame ();
 
@@ -745,6 +843,12 @@ void R_BeginRegistration (void)
 	ri.reg.registerFrame++;
 
 	R_BeginImageRegistration ();
+
+#if EGL_MODERN_RENDERER
+	/* Modern Renderer: Reset world geometry/buffers on new map load */
+	void RM_World_Shutdown(void);
+	RM_World_Shutdown();
+#endif
 }
 
 

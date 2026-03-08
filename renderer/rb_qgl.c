@@ -39,6 +39,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # ifdef HAVE_SDL2
 	/* SDL2 backend: don't depend on the Win32/WGL glwState. */
 	# include <windows.h>
+	# include <SDL2/SDL.h>
 
 	static HMODULE qgl_hInstOpenGL;
 	static FILE *qgl_oglLogFP;
@@ -46,7 +47,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 	# define LOGPROC	(qgl_oglLogFP)
 	static void *QGL_SDLGetProcAddress (const char *procName)
 	{
-		void *proc = (void *)wglGetProcAddress ((LPCSTR) procName);
+		void *proc = (void *)SDL_GL_GetProcAddress (procName);
 		if (!proc && qgl_hInstOpenGL)
 			proc = (void *)GetProcAddress (qgl_hInstOpenGL, procName);
 		return proc;
@@ -6246,7 +6247,16 @@ QGL_GetProcAddress
 void *QGL_GetProcAddress (const char *procName)
 {
 #ifdef _WIN32
+	# ifdef HAVE_SDL2
+	/* SDL2 backend: Use SDL_GL_GetProcAddress first, fallback to GetProcAddress */
+	void *proc = (void *)SDL_GL_GetProcAddress (procName);
+	if (!proc && qgl_hInstOpenGL)
+		proc = (void *)GetProcAddress (qgl_hInstOpenGL, procName);
+	return proc;
+	# else
+	/* Win32 backend: Use wglGetProcAddress */
 	return qwglGetProcAddress ((LPCSTR) procName);
+	# endif
 #elif defined __unix__
 	if (glxState.OpenGLLib)
 		return (void *)dlsym (glxState.OpenGLLib, procName);

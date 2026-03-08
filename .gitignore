@@ -156,3 +156,7 @@ test_*_output*.txt
 
 # Local high-size binary content (not required to build)
 /expert/
+
+# local dev scripts
+/test_glad.ps1
+

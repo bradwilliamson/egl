@@ -22,6 +22,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 //
 
 #include "rf_local.h"
+#include "rb_gl.h"
+#include "r_caps.h"
+
+#if EGL_MODERN_RENDERER
+# include "modern/rm_shader.h"
+# include "modern/rm_backend.h"
+# include "modern/rm_caps.h"
+#endif
 
 cVar_t	*e_test_0;
 cVar_t	*e_test_1;
@@ -152,10 +160,24 @@ cVar_t	*gl_picmip;
 cVar_t	*gl_screenshot;
 cVar_t	*gl_texturemode;
 
+cVar_t	*r_backend;
+cVar_t	*rm_test_triangle;
+cVar_t	*rm_use_fbo;
+cVar_t	*r_persistent_map;
+
 static void	*cmd_gfxInfo;
 static void	*cmd_rendererClass;
 static void	*cmd_eglRenderer;
 static void	*cmd_eglVersion;
+static void	*cmd_glLoader;
+static void	*cmd_glCaps;
+
+#if EGL_MODERN_RENDERER
+/* Modern renderer console commands */
+static void	*cmd_shaderTest;
+static void	*cmd_shaderList;
+static void	*cmd_shaderReload;
+#endif
 
 /*
 =============================================================================
@@ -1299,6 +1321,20 @@ static void R_Register (void)
 
 	gl_texturemode		= Cvar_Register ("gl_texturemode",		"GL_LINEAR_MIPMAP_NEAREST",	CVAR_ARCHIVE);
 
+	r_backend			= Cvar_Register ("r_backend",
+#if EGL_MODERN_RENDERER
+							"modern",
+#else
+							"legacy",
+#endif
+							CVAR_ARCHIVE);
+
+#if EGL_MODERN_RENDERER
+	rm_test_triangle	= Cvar_Register ("rm_test_triangle",	"0",					0);
+	rm_use_fbo		= Cvar_Register ("rm_use_fbo",		"0",					0);  /* 0 = draw to backbuffer (workaround black screen) */
+	r_persistent_map	= Cvar_Register ("r_persistent_map",	"0",					CVAR_ARCHIVE);
+#endif
+
 	// Force these to update next endframe
 	r_swapInterval->modified = qTrue;
 	gl_drawbuffer->modified = qTrue;
@@ -1312,6 +1348,15 @@ static void R_Register (void)
 	cmd_rendererClass	= Cmd_AddCommand ("rendererclass",	R_RendererClass_f,		"Prints out the renderer class");
 	cmd_eglRenderer		= Cmd_AddCommand ("egl_renderer",	R_RendererMsg_f,		"Spams to the server your renderer information");
 	cmd_eglVersion		= Cmd_AddCommand ("egl_version",	R_VersionMsg_f,			"Spams to the server your client version");
+	cmd_glLoader		= Cmd_AddCommand ("gl_loader",		GL_Loader_f,			"Prints GLAD loader status and OpenGL information");
+	cmd_glCaps			= Cmd_AddCommand ("gl_caps",		GL_Caps_f,				"Prints comprehensive OpenGL capabilities report");
+
+#if EGL_MODERN_RENDERER
+	// Modern renderer commands
+	cmd_shaderTest		= Cmd_AddCommand ("shader_test",	RM_ShaderTest_f,		"Tests shader compilation: shader_test <name>");
+	cmd_shaderList		= Cmd_AddCommand ("shader_list",	RM_ShaderList_f,		"Lists loaded shaders");
+	cmd_shaderReload	= Cmd_AddCommand ("shader_reload",	RM_ShaderReload_f,		"Reloads shader: shader_reload <name|all>");
+#endif
 }
 
 
@@ -1327,6 +1372,7 @@ rInit_t R_Init (void)
 	uint32	initTime;
 
 	initTime = Sys_UMilliseconds ();
+	FILE *logf = fopen("modern.log", "a"); if (logf) { fprintf(logf, "R_Init start\n"); fclose(logf); }
 	Com_Printf (0, "\n-------- Refresh Initialization --------\n");
 
 	ri.frameCount = 1;
@@ -1407,6 +1453,12 @@ rInit_t R_Init (void)
 		return R_INIT_MODE_FAIL;
 	}
 
+	// Initialize GLAD loader after context creation (optional, non-fatal)
+	if (!GL_InitLoader ()) {
+		Com_Printf (PRNT_WARNING, "...GLAD loader initialization failed\n");
+		Com_Printf (PRNT_WARNING, "...continuing with legacy OpenGL loader\n");
+	}
+
 	// Some drivers can leave an error queued during mode/context transitions.
 	// Clear it here so later GL_CheckForError() calls report only real init errors.
 	while (qglGetError () != GL_NO_ERROR) {
@@ -1433,6 +1485,22 @@ rInit_t R_Init (void)
 
 	// Extension string
 	ri.extensionString = qglGetString (GL_EXTENSIONS);
+
+	// Initialize OpenGL capabilities detection
+	GL_InitCaps ();
+
+#if EGL_MODERN_RENDERER
+	// Initialize modern-renderer capabilities detection (GL 3.3+ / GL 4.x)
+	RM_Caps_Init ();
+#endif
+
+	// Print renderer build configuration
+	Com_Printf (0, "Renderer Configuration: %s\n", EGL_RENDERER_CONFIG);
+
+#if EGL_MODERN_RENDERER
+	// Initialize modern shader system
+	RM_InitShaderSystem ();
+#endif
 
 	// Decide on a renderer class
 	if (strstr (rendererBuffer, "glint"))			ri.renderClass = REND_CLASS_3DLABS_GLINT_MX;
@@ -1556,6 +1624,14 @@ rInit_t R_Init (void)
 	RF_2DInit ();
 	GL_CheckForError ("RF_2DInit");
 
+#if EGL_MODERN_RENDERER
+	{ FILE *logf = fopen("modern.log", "a"); if (logf) { fprintf(logf, "Before RM_Backend_Init\n"); fclose(logf); }
+	Com_Printf(0, "R_Init: calling RM_Backend_Init\n"); }
+	RM_Backend_Init ();
+	{ FILE *logf = fopen("modern.log", "a"); if (logf) { fprintf(logf, "After RM_Backend_Init\n"); fclose(logf); }
+	Com_Printf(0, "R_Init: RM_Backend_Init completed\n"); }
+#endif
+
 	// Check for gl errors
 	GL_CheckForError ("R_Init");
 
@@ -1591,6 +1667,11 @@ void R_Shutdown (qBool full)
 	R_ModelShutdown ();
 	R_WorldShutdown ();
 	RB_Shutdown ();
+
+#if EGL_MODERN_RENDERER
+	// Shutdown modern backend if active
+	RM_Backend_Shutdown ();
+#endif
 
 	Com_Printf (0, "----------------------------------------\n");
 

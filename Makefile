@@ -9,6 +9,10 @@ ifeq ($(CC),cc)
 CC = gcc
 endif
 
+# Renderer build configuration (default: legacy-only)
+EGL_LEGACY ?= 1
+EGL_MODERN ?= 0
+
 # Optional SDL2 backend (set USE_SDL2=1 to enable)
 ifdef USE_SDL2
 # Allow overriding MSYS2 location/prefix via env or make vars.
@@ -25,11 +29,11 @@ SDL2_SOURCES = sdl2/sdl_glimp.c sdl2/sdl_input.c sdl2/sdl_snd.c sdl2/sdl_main.c
 else
 SDL2_SOURCES =
 endif
-CFLAGS += -DWIN32 -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
+CFLAGS += -DWIN32 -DEGL_LEGACY_RENDERER=$(EGL_LEGACY) -DEGL_MODERN_RENDERER=$(EGL_MODERN) -m64 -O2 -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
 LDFLAGS += -m64 -mwindows -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lwinhttp -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
 
 # Optional debug build (symbols + no optimization) for diagnosing crashes.
-DBG_CFLAGS = -DWIN32 -m64 -O0 -g3 -fno-omit-frame-pointer -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
+DBG_CFLAGS = -DWIN32 -DEGL_LEGACY_RENDERER=$(EGL_LEGACY) -DEGL_MODERN_RENDERER=$(EGL_MODERN) -m64 -O0 -g3 -fno-omit-frame-pointer -Wall -Wno-deprecated-declarations -Wno-unused-function -I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./win32
 DBG_LDFLAGS = -m64 -mwindows -Wl,--pdb=egl.pdb -lopengl32 -lglu32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32 -lwinhttp -lole32 -luuid -lwindowscodecs -lz -lminizip -ldbghelp
 
 # Dedicated server build (no renderer/client). Uses separate objects to avoid flag collisions.
@@ -57,7 +61,11 @@ CLIENT_SRC = $(wildcard client/*.c) $(wildcard win32/*.c)
 endif
 CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
 GAME_SRC = $(wildcard game/*.c)
-RENDERER_SRC = $(wildcard renderer/*.c)
+RENDERER_SRC = $(wildcard renderer/*.c) renderer/glad/glad.c
+# Conditionally add modern renderer sources if EGL_MODERN=1
+ifeq ($(EGL_MODERN),1)
+RENDERER_SRC += $(wildcard renderer/modern/*.c)
+endif
 SERVER_SRC = $(filter-out server/server_stubs.c, $(wildcard server/*.c))
 
 # Dedicated build uses only the Win32 system/console/net layer.

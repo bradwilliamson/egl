@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "cl_local.h"
 
+
+
 /*
 =============================================================================
 
@@ -84,12 +86,12 @@ void SCR_UpdateScreen (void)
 	float	separation[2];
 
 	// If the screen is disabled do nothing at all
-	if (cls.disableScreen)
-		return;
+	if (cls.disableScreen) return;
 
 	// Not initialized yet
-	if (!clMedia.initialized)
-		return;
+	if (!clMedia.initialized) return;
+
+
 
 	// Set separation values
 	if (cls.refConfig.stereoEnabled) {

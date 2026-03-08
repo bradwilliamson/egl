@@ -9,11 +9,15 @@
 
 CC ?= cc
 
+# Renderer build configuration (default: legacy-only)
+EGL_LEGACY ?= 1
+EGL_MODERN ?= 0
+
 # Common flags
 WARN_CFLAGS = -Wall -Wno-deprecated-declarations -Wno-unused-function -fcommon
 OPT_CFLAGS ?= -O2
 
-CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing \
+CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -DEGL_LEGACY_RENDERER=$(EGL_LEGACY) -DEGL_MODERN_RENDERER=$(EGL_MODERN) -fno-strict-aliasing \
 	-I. -I./include -I./shared -I./renderer -I./client -I./cgame -I./game -I./server -I./unix
 
 # Link flags
@@ -21,16 +25,7 @@ CFLAGS_COMMON = $(OPT_CFLAGS) $(WARN_CFLAGS) -DHAVE_XRANDR -fno-strict-aliasing 
 # -lXrandr is added to support modern mode switching and gamma on X11.
 # -ldl is required for dlopen() (modules + OpenAL loader).
 LDFLAGS_COMMON = -ldl -lm -lz -lminizip -ljpeg -lpng
-
-# libcurl for HTTP master server fetching (client only)
-CURL_CFLAGS := $(shell pkg-config --cflags libcurl 2>/dev/null)
-CURL_LIBS := $(shell pkg-config --libs libcurl 2>/dev/null)
-ifeq ($(CURL_LIBS),)
-  CURL_LIBS := -lcurl
-endif
-CFLAGS_COMMON += $(CURL_CFLAGS)
 LDFLAGS_CLIENT = -lX11 -lGL -lXrandr $(LDFLAGS_COMMON)
-LDFLAGS_CLIENT += $(CURL_LIBS)
 
 # Dedicated build (no renderer/client)
 DED_CFLAGS = $(OPT_CFLAGS) $(WARN_CFLAGS) -DDEDICATED_ONLY -fno-strict-aliasing \
@@ -51,6 +46,10 @@ CLIENT_SRC = $(wildcard client/*.c)
 CGAME_SRC = $(wildcard cgame/*.c) $(wildcard cgame/menu/*.c) $(wildcard cgame/ui/*.c)
 GAME_SRC = $(wildcard game/*.c)
 RENDERER_SRC = $(wildcard renderer/*.c)
+# Conditionally add modern renderer sources if EGL_MODERN=1
+ifeq ($(EGL_MODERN),1)
+RENDERER_SRC += $(wildcard renderer/modern/*.c)
+endif
 SERVER_SRC = $(filter-out server/server_stubs.c, $(wildcard server/*.c))
 
 # Unix platform sources
