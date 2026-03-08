@@ -16,6 +16,7 @@
 #include "../glad/glad.h"
 
 #include "../r_local.h"
+#include "rm_dsa.h"
 #include "rm_particle.h"
 #include "rm_shader.h"
 #include "rm_tess.h"
@@ -67,12 +68,14 @@ void RM_Particle_Init(void)
 	rm_partLoc_Texture = glGetUniformLocation(rm_particleShader->program, "u_Texture");
 	
 	/* Create fallback white texture */
-	glGenTextures(1, &rm_particleWhiteTex);
-	glBindTexture(GL_TEXTURE_2D, rm_particleWhiteTex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	rm_particleWhiteTex = RM_CreateTexture2D();
+	if (!rm_particleWhiteTex) {
+		Com_Printf(PRNT_ERROR, "RM_Particle_Init: Failed to create fallback texture\n");
+		return;
+	}
+	RM_TexImage2D(rm_particleWhiteTex, 1, 1, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, whitePixel);
+	RM_TexParameteri(rm_particleWhiteTex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	RM_TexParameteri(rm_particleWhiteTex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	
 	rm_particleInitialized = qTrue;
 	

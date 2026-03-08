@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "../r_local.h"
 #include "rm_backend.h"
+#include "rm_dsa.h"
 #include "rm_debug.h"
 #include "rm_fbo.h"
 #include "rm_geom.h"
@@ -62,6 +63,9 @@ static void RM_Modern_Init (void)
 
 	/* Enable GL debug output if available */
 	RM_Debug_Init ();
+
+	/* Optional DSA wrappers reduce bind-to-edit churn when supported. */
+	RM_DSA_Init ();
 
 	/* Initialize tessellator buffers (persistent-map or streaming) */
 	RM_Tess_Init ();
@@ -115,6 +119,8 @@ static void RM_Modern_Shutdown (void)
 
 	/* Shutdown modern geometry module */
 	RM_Geom_Shutdown ();
+
+	RM_DSA_Shutdown ();
 }
 
 static void RM_Modern_BeginFrame (refDef_t *fd)

@@ -114,6 +114,9 @@ temp_backup_draw.txt
 
 # Local one-off repo analysis docs
 /CODE_HEALTH_ANALYSIS.md
+/agent/
+/modern.log
+/rm_*_dump.glsl
 
 # Local crash dumps / debugger artifacts
 /crashdumps/

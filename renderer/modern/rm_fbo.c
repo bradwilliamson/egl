@@ -10,6 +10,7 @@
 #define RM_NO_LEGACY_GL
 #include "../glad/glad.h"
 #include "r_local.h"
+#include "rm_dsa.h"
 #include "rm_fbo.h"
 
 #include <stdlib.h>
@@ -73,33 +74,38 @@ rm_fbo_t *RM_FBO_Create (int width, int height)
 	fbo->width = width;
 	fbo->height = height;
 
-	glGenFramebuffers (1, (GLuint *)&fbo->id);
-	glBindFramebuffer (GL_FRAMEBUFFER, (GLuint)fbo->id);
+	fbo->id = RM_CreateFramebuffer ();
 
 	/* Color attachment */
-	glGenTextures (1, (GLuint *)&fbo->color_tex);
-	glBindTexture (GL_TEXTURE_2D, (GLuint)fbo->color_tex);
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	fbo->color_tex = RM_CreateTexture2D ();
+	if (!fbo->id || !fbo->color_tex) {
+		Com_Printf (PRNT_ERROR, "RM_FBO_Create: failed to allocate framebuffer objects\n");
+		RM_FBO_Destroy (fbo);
+		return NULL;
+	}
+	RM_TexImage2D ((GLuint)fbo->color_tex, width, height, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	/* CRITICAL: Disable mipmaps, set filter/wrap so texture is complete (no "incomplete" error) */
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint)fbo->color_tex, 0);
+	RM_TexParameteri ((GLuint)fbo->color_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	RM_TexParameteri ((GLuint)fbo->color_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	RM_TexParameteri ((GLuint)fbo->color_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	RM_TexParameteri ((GLuint)fbo->color_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	RM_FramebufferTexture2D ((GLuint)fbo->id, GL_COLOR_ATTACHMENT0, (GLuint)fbo->color_tex);
 
 	/* Depth attachment (pure depth, no stencil – safe mode for compatibility) */
-	glGenTextures (1, (GLuint *)&fbo->depth_tex);
-	glBindTexture (GL_TEXTURE_2D, (GLuint)fbo->depth_tex);
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, (GLuint)fbo->depth_tex, 0);
+	fbo->depth_tex = RM_CreateTexture2D ();
+	if (!fbo->depth_tex) {
+		Com_Printf (PRNT_ERROR, "RM_FBO_Create: failed to allocate depth texture\n");
+		RM_FBO_Destroy (fbo);
+		return NULL;
+	}
+	RM_TexImage2D ((GLuint)fbo->depth_tex, width, height, GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+	RM_TexParameteri ((GLuint)fbo->depth_tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	RM_TexParameteri ((GLuint)fbo->depth_tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	RM_TexParameteri ((GLuint)fbo->depth_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	RM_TexParameteri ((GLuint)fbo->depth_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	RM_FramebufferTexture2D ((GLuint)fbo->id, GL_DEPTH_ATTACHMENT, (GLuint)fbo->depth_tex);
 
-	status = glCheckFramebufferStatus (GL_FRAMEBUFFER);
-	glBindFramebuffer (GL_FRAMEBUFFER, 0);
-	glBindTexture (GL_TEXTURE_2D, 0);
+	status = RM_CheckFramebufferStatus ((GLuint)fbo->id);
 
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
 		Com_Printf (PRNT_ERROR, "RM_FBO_Create: framebuffer incomplete (0x%X)\n", (unsigned int)status);

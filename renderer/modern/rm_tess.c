@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #include "../r_local.h"
 #include "../rb_gl.h"
 #include "rm_caps.h"
+#include "rm_dsa.h"
 #include "rm_tess.h"
 
 #include <stdint.h>
@@ -80,7 +81,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 typedef uint64_t GLuint64;
 
-typedef void (APIENTRY *PFNGLBUFFERSTORAGEPROC)(GLenum target, GLsizeiptr size, const void *data, GLbitfield flags);
 typedef void *(APIENTRY *PFNGLMAPBUFFERRANGEPROC)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 typedef GLboolean (APIENTRY *PFNGLUNMAPBUFFERPROC)(GLenum target);
 
@@ -89,7 +89,6 @@ typedef GLenum (APIENTRY *PFNGLCLIENTWAITSYNCPROC)(GLsync sync, GLbitfield flags
 typedef void (APIENTRY *PFNGLDELETESYNCPROC)(GLsync sync);
 typedef void (APIENTRY *PFNGLMEMORYBARRIERPROC)(GLbitfield barriers);
 
-static PFNGLBUFFERSTORAGEPROC rm_glBufferStorage = NULL;
 static PFNGLMAPBUFFERRANGEPROC rm_glMapBufferRange = NULL;
 static PFNGLUNMAPBUFFERPROC rm_glUnmapBuffer = NULL;
 static PFNGLFENCESYNCPROC rm_glFenceSync = NULL;
@@ -108,8 +107,6 @@ static const size_t rm_tessIndexStride = RM_TESS_INDEX_STRIDE_BYTES;
 
 static void RM_Tess_LoadPersistentProcs (void)
 {
-	if (!rm_glBufferStorage)
-		rm_glBufferStorage = (PFNGLBUFFERSTORAGEPROC)GL_GetProcAddress ("glBufferStorage");
 	if (!rm_glMapBufferRange)
 		rm_glMapBufferRange = (PFNGLMAPBUFFERRANGEPROC)GL_GetProcAddress ("glMapBufferRange");
 	if (!rm_glUnmapBuffer)
@@ -229,11 +226,8 @@ static void RM_Tess_InitStreaming (void)
 	rm_tess.vertices = (float *)malloc (RM_TESS_MAX_VERTICES * rm_tessVertexStride);
 	rm_tess.indices = (GLuint *)malloc (RM_TESS_MAX_INDICES * rm_tessIndexStride);
 
-	glBindBuffer (GL_ARRAY_BUFFER, rm_tess.vbo);
-	glBufferData (GL_ARRAY_BUFFER, RM_TESS_MAX_VERTICES * rm_tessVertexStride, NULL, GL_STREAM_DRAW);
-
-	glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, rm_tess.ebo);
-	glBufferData (GL_ELEMENT_ARRAY_BUFFER, RM_TESS_MAX_INDICES * rm_tessIndexStride, NULL, GL_STREAM_DRAW);
+	RM_BufferData (rm_tess.vbo, GL_ARRAY_BUFFER, RM_TESS_MAX_VERTICES * rm_tessVertexStride, NULL, GL_STREAM_DRAW);
+	RM_BufferData (rm_tess.ebo, GL_ELEMENT_ARRAY_BUFFER, RM_TESS_MAX_INDICES * rm_tessIndexStride, NULL, GL_STREAM_DRAW);
 
 	RM_Tess_SetVaoPointers (0);
 
@@ -250,16 +244,19 @@ static qBool RM_Tess_InitPersistent (void)
 
 	RM_Tess_LoadPersistentProcs ();
 
-	if (!rm_glBufferStorage || !rm_glMapBufferRange || !rm_glFenceSync || !rm_glClientWaitSync || !rm_glDeleteSync || !rm_glMemoryBarrier) {
+	if (!rm_glMapBufferRange || !rm_glFenceSync || !rm_glClientWaitSync || !rm_glDeleteSync || !rm_glMemoryBarrier) {
 		return qFalse;
 	}
 
+	if (!RM_BufferStorage (rm_tess.vbo, GL_ARRAY_BUFFER, (GLsizeiptr)vboSize, NULL, flags))
+		return qFalse;
+	if (!RM_BufferStorage (rm_tess.ebo, GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)eboSize, NULL, flags))
+		return qFalse;
+
 	glBindBuffer (GL_ARRAY_BUFFER, rm_tess.vbo);
-	rm_glBufferStorage (GL_ARRAY_BUFFER, (GLsizeiptr)vboSize, NULL, flags);
 	rm_tess.mappedVerts = rm_glMapBufferRange (GL_ARRAY_BUFFER, 0, (GLsizeiptr)vboSize, flags);
 
 	glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, rm_tess.ebo);
-	rm_glBufferStorage (GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)eboSize, NULL, flags);
 	rm_tess.mappedIndices = rm_glMapBufferRange (GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)eboSize, flags);
 
 	if (!rm_tess.mappedVerts || !rm_tess.mappedIndices) {
@@ -305,8 +302,8 @@ void RM_Tess_Init (void)
 	memset (&rm_tess, 0, sizeof (rm_tess));
 
 	glGenVertexArrays (1, &rm_tess.vao);
-	glGenBuffers (1, &rm_tess.vbo);
-	glGenBuffers (1, &rm_tess.ebo);
+	rm_tess.vbo = RM_CreateBuffer ();
+	rm_tess.ebo = RM_CreateBuffer ();
 
 	wantPersistent = (RM_HAS_PERSISTENT () && r_persistent_map && r_persistent_map->intVal != 0) ? qTrue : qFalse;
 	if (wantPersistent) {
@@ -314,8 +311,8 @@ void RM_Tess_Init (void)
 			/* Persistent failed; recreate mutable buffers for streaming */
 			glDeleteBuffers (1, &rm_tess.vbo);
 			glDeleteBuffers (1, &rm_tess.ebo);
-			glGenBuffers (1, &rm_tess.vbo);
-			glGenBuffers (1, &rm_tess.ebo);
+			rm_tess.vbo = RM_CreateBuffer ();
+			rm_tess.ebo = RM_CreateBuffer ();
 			RM_Tess_InitStreaming ();
 		}
 	} else {
@@ -453,16 +450,9 @@ void RM_Tess_Flush (void)
 		if (rm_glMemoryBarrier)
 			rm_glMemoryBarrier (GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
 	} else {
-		glBindBuffer (GL_ARRAY_BUFFER, rm_tess.vbo);
-		/* q2pro-style streaming: allocate+upload in one call (driver may orphan internally) */
-		glBufferData (GL_ARRAY_BUFFER, (GLsizeiptr)vboBytes, rm_tess.vertices, GL_STREAM_DRAW);
-
-		glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, rm_tess.ebo);
-		glBufferData (GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)eboBytes, rm_tess.indices, GL_STREAM_DRAW);
-
-		/* Avoid leaking bindings into legacy fixed-function code paths. */
-		glBindBuffer (GL_ARRAY_BUFFER, 0);
-		glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, 0);
+		/* q2pro-style streaming: allocate+upload in one call (driver may orphan internally). */
+		RM_BufferData (rm_tess.vbo, GL_ARRAY_BUFFER, (GLsizeiptr)vboBytes, rm_tess.vertices, GL_STREAM_DRAW);
+		RM_BufferData (rm_tess.ebo, GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)eboBytes, rm_tess.indices, GL_STREAM_DRAW);
 	}
 
 	glBindVertexArray (rm_tess.vao);
